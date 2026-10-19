@@ -34,7 +34,7 @@ not model decisions.
 | --- | --- |
 | Agent wallet | TODO |
 | ERC-8004 agent ID | TODO |
-| Attribution tag | TODO |
+| Attribution tag | `celo_aa27de260db7` |
 | x402 PayTo address | TODO |
 
 ## Declared limits
