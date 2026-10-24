@@ -1,0 +1,38 @@
+{
+  "name": "sena-agent",
+  "version": "0.1.0",
+  "description": "Seña: agente que cobra señas de turnos en wARS sobre Celo (x402) y decide qué hacer con cada cancelación.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/main.js",
+    "demo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/demo-local.mjs",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/*.test.js\"",
+    "build:web": "esbuild web/pay.js --bundle --format=esm --platform=browser --target=es2022 --minify --outfile=public/pay.bundle.js",
+    "check": "npm run build:web && npm test",
+    "address": "node --env-file-if-exists=.env scripts/show-address.mjs",
+    "balance": "node --env-file-if-exists=.env scripts/balance.mjs",
+    "probe": "node --env-file-if-exists=.env scripts/probe.mjs",
+    "register": "node --env-file-if-exists=.env scripts/register-agent.mjs",
+    "verify-tag": "node --env-file-if-exists=.env scripts/verify-tag.mjs",
+    "pay": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/pay-booking.mjs"
+  },
+  "dependencies": {
+    "@celo/attribution-tags": "0.5.0",
+    "@x402/core": "2.28.0",
+    "@x402/evm": "2.28.0",
+    "@x402/express": "2.28.0",
+    "@x402/extensions": "2.28.0",
+    "@x402/fetch": "2.28.0",
+    "express": "5.3.0",
+    "grammy": "1.46.0",
+    "viem": "^2.48.11"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

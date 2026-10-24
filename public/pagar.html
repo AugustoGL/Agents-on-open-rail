@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pagar seña · Seña</title>
+  <style>
+    :root { --bg: #f6f4ee; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6a64; --line: #e4e1d6; --accent: #2f6f4e; --accent-ink: #ffffff; --err: #a3352b; --ok: #2f6f4e; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #141412; --card: #1e1e1b; --ink: #f1efe8; --muted: #a8a69e; --line: #33322d; --accent: #5fae84; --accent-ink: #0d1a12; --err: #e07a6f; --ok: #7cc99f; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 440px; margin: 0 auto; padding: 24px 16px 48px; }
+    .brand { font-weight: 700; letter-spacing: .02em; color: var(--muted); font-size: 13px; text-transform: uppercase; }
+    h1 { font-size: 22px; margin: 4px 0 20px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+    .row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+    .row:last-child { border-bottom: 0; }
+    .row span:first-child { color: var(--muted); }
+    .big { font-size: 28px; font-weight: 700; }
+    button, .btn { display: block; width: 100%; margin-top: 14px; padding: 14px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-size: 16px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; }
+    button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    button:disabled { opacity: .6; }
+    [hidden] { display: none !important; }
+    .status { margin-top: 16px; padding: 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); }
+    .status.error { border-color: var(--err); color: var(--err); }
+    .status.ok { border-color: var(--ok); color: var(--ok); }
+    #wallet { color: var(--muted); font-size: 14px; margin-top: 10px; }
+    details { margin-top: 20px; color: var(--muted); font-size: 14px; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">Seña · pago de turno</div>
+    <h1 id="negocio">Cargando…</h1>
+    <div class="card">
+      <div class="row"><span>Turno</span><span id="turno">—</span></div>
+      <div class="row"><span>Reserva</span><span id="id">—</span></div>
+      <div class="row"><span>Seña</span><span class="big" id="monto">—</span></div>
+    </div>
+    <div id="wallet"></div>
+    <button id="connect">Conectar wallet</button>
+    <button id="approve" class="secondary" hidden>Habilitar wARS (una sola vez)</button>
+    <button id="pay" hidden>Pagar seña</button>
+    <a id="ramp" class="btn" hidden target="_blank" rel="noopener">Cargar pesos con Ripio</a>
+    <a id="tx" hidden target="_blank" rel="noopener">Ver la transacción en Celoscan</a>
+    <div id="status" class="status">Cargando la reserva…</div>
+    <details>
+      <summary>¿Cómo funciona?</summary>
+      <p>La seña se paga en wARS, el peso argentino digital de Ripio, sobre la red Celo. Firmás una autorización desde tu wallet y la plata va directo al complejo. Las devoluciones vuelven a la misma wallet.</p>
+      <ul id="politica"></ul>
+    </details>
+  </main>
+  <script type="module" src="/static/pay.bundle.js"></script>
+</body>
+</html>

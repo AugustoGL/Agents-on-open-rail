@@ -1,0 +1,29 @@
+{
+  "nombre": "Pádel Demo",
+  "esDemostracion": true,
+  "descripcion": "Comercio de demostración para la hackathon Agents on Open Rails. Los turnos y precios son de ejemplo.",
+  "utcOffsetMinutos": -180,
+  "recursos": ["Cancha 1", "Cancha 2"],
+  "horarios": ["09:00", "10:30", "12:00", "17:00", "18:30", "20:00", "21:30"],
+  "duracionMinutos": 90,
+  "diasAdelante": 7,
+  "anticipacionMinimaMinutos": 60,
+  "precioTurnoArs": 24000,
+  "senaPorcentaje": 25,
+  "reservaSinPagarMinutos": 15,
+  "politica": {
+    "devolucionTotalHorasAntes": 24,
+    "devolucionParcialHorasAntes": 6,
+    "devolucionParcialPorcentaje": 50,
+    "devolverSiSeRevende": true,
+    "ofertaListaEsperaMinutos": 30
+  },
+  "limites": {
+    "devolucionMaxAutomaticaArs": 20000,
+    "devolucionesMaxDiariasArs": 60000,
+    "transferenciaMaxArs": 300000
+  },
+  "cierre": {
+    "reservaMinimaArs": 0
+  }
+}

@@ -1,4 +1,4 @@
-# Secrets: never commit these
+# Secretos: nunca se suben
 .env
 .env.*
 !.env.example
@@ -8,24 +8,25 @@
 secrets/
 keystore/
 
+# Base de datos local
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Node
+node_modules/
+dist/
+
 # Python
 __pycache__/
 *.pyc
 .venv/
 venv/
 
-# Node
-node_modules/
-dist/
-.next/
-
-# Local data and logs
-*.db
-*.sqlite
+# Logs y editor
 *.log
-data/
-
-# Editor / OS
 .vscode/
 .idea/
 .DS_Store

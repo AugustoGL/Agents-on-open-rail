@@ -1,0 +1,12 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "Seña · Pádel Demo",
+  "description": "Agente que cobra señas de turnos en wARS (peso argentino de Ripio) sobre Celo por x402 y decide solo qué hacer con cada cancelación: devuelve, retiene o reubica el turno con la lista de espera. Comercio de demostración para Agents on Open Rails.",
+  "services": [
+    { "name": "web", "endpoint": "https://github.com/AugustoGL/Agents-on-open-rail" },
+    { "name": "wallet", "endpoint": "eip155:42220:0x84c67d2cB87C7f8EA1355B8F0914A2a3Df0367C8" }
+  ],
+  "x402Support": true,
+  "active": true,
+  "supportedTrust": ["reputation"]
+}
