@@ -5,6 +5,8 @@
 *.key
 *.pem
 *.secret
+service-account*.json
+*-service-account*.json
 secrets/
 keystore/
 

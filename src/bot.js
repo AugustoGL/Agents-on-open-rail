@@ -3,6 +3,8 @@
 import { Bot, InlineKeyboard } from 'grammy';
 import { formatArs } from './money.js';
 import { formatLocalDay, localToUtcMs } from './time.js';
+import { AgendaError } from './agenda.js';
+import { AGENDA_DOWN_MESSAGE } from './agent.js';
 
 const HELP = [
   'Soy el agente de reservas. Esto es lo que puedo hacer:',
@@ -68,8 +70,22 @@ export function createBot({ token, agent, ownerChatId, interpreter, botInfo, log
     return ctx.reply('¿Qué día querés jugar?', { reply_markup: kb });
   };
 
+  /** Turnos de un día. Si el calendario del comercio no responde, avisa y devuelve null. */
+  const slotsOf = async (ctx, date) => {
+    try {
+      return await agent.listSlotsChecked({ dateStr: date });
+    } catch (err) {
+      if (!(err instanceof AgendaError)) throw err;
+      logger.warn?.(`[bot] calendario no disponible: ${err.message}`);
+      await ctx.reply(AGENDA_DOWN_MESSAGE);
+      return null;
+    }
+  };
+
   const showSlots = async (ctx, date, { only } = {}) => {
-    const slots = agent.listSlots({ dateStr: date }).filter((s) => !only || only(s));
+    const all = await slotsOf(ctx, date);
+    if (!all) return undefined;
+    const slots = all.filter((s) => !only || only(s));
     if (slots.length === 0) return ctx.reply('No hay turnos ese día. Probá con otro: /reservar');
     const kb = new InlineKeyboard();
     slots.forEach((s, i) => {
@@ -86,7 +102,7 @@ export function createBot({ token, agent, ownerChatId, interpreter, botInfo, log
   };
 
   const reserveSlot = async (ctx, resource, startAt) => {
-    const r = agent.reserve({ resource, startAt, customer: customerOf(ctx) });
+    const r = await agent.reserveChecked({ resource, startAt, customer: customerOf(ctx) });
     if (r.ok) return replyBooking(ctx, r.booking, '📌 Te guardé el turno.');
     if (r.code === 'ocupado') {
       return ctx.reply(r.reason, { reply_markup: new InlineKeyboard().text('Anotarme en la lista de espera', `w:${R.indexOf(resource)}:${startAt}`) });
@@ -153,7 +169,7 @@ export function createBot({ token, agent, ownerChatId, interpreter, botInfo, log
   });
   bot.callbackQuery(/^w:(\d+):(\d+)$/, async (ctx) => {
     await ctx.answerCallbackQuery();
-    const r = agent.joinWaitlist({ resource: R[Number(ctx.match[1])], startAt: Number(ctx.match[2]), customer: customerOf(ctx) });
+    const r = await agent.joinWaitlistChecked({ resource: R[Number(ctx.match[1])], startAt: Number(ctx.match[2]), customer: customerOf(ctx) });
     if (!r.ok) return ctx.reply(r.reason);
     return ctx.reply(`Listo, quedaste ${r.position === 1 ? 'primero' : `en el puesto ${r.position}`} en la lista de espera. Si se libera, te lo guardo ${agent.business.politica.ofertaListaEsperaMinutos} minutos y te aviso acá.`);
   });
@@ -214,7 +230,9 @@ export function createBot({ token, agent, ownerChatId, interpreter, botInfo, log
         if (!intent.fecha) return showDays(ctx);
         if (intent.hora) {
           const startAt = localToUtcMs(intent.fecha, intent.hora, agent.offset);
-          const match = agent.listSlots({ dateStr: intent.fecha }).filter((s) => s.startAt === startAt && (!intent.recurso || s.resource === intent.recurso));
+          const all = await slotsOf(ctx, intent.fecha);
+          if (!all) return undefined;
+          const match = all.filter((s) => s.startAt === startAt && (!intent.recurso || s.resource === intent.recurso));
           const free = match.filter((s) => s.free);
           if (intent.accion === 'reservar' && free.length === 1 && intent.recurso) return reserveSlot(ctx, free[0].resource, startAt);
           if (match.length > 0) return showSlots(ctx, intent.fecha, { only: (s) => s.startAt === startAt });

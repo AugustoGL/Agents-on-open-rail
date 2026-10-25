@@ -9,9 +9,11 @@ import { arsToWei, formatArs } from './money.js';
 import {
   localToUtcMs, localDateStr, addDays, formatLocal, startOfLocalDay,
 } from './time.js';
+import { LocalAgenda, slotIsFreeIn } from './agenda.js';
 
 const MINUTE = 60_000;
 const MAX_HOLDS_PER_CUSTOMER = 2;
+export const AGENDA_DOWN_MESSAGE = 'No puedo ver el calendario del comercio en este momento, así que no confirmo ni cobro nada. Probá de nuevo en unos minutos.';
 
 export const nullNotifier = {
   async toCustomer() {},
@@ -28,8 +30,10 @@ export class SenaAgent {
    * @param {object} [deps.notifier] { toCustomer(customerId, text), toOwner(text) }
    * @param {string} [deps.publicBaseUrl]
    * @param {string} [deps.payoutAddress] dirección del dueño para el retiro diario
+   * @param {object} [deps.agenda] fuente de agenda (ver agenda.js); por defecto la grilla propia en SQLite
    */
-  constructor({ store, business, chain, clock = Date, notifier = nullNotifier, logger = console, publicBaseUrl = 'http://localhost:8402', payoutAddress = null }) {
+  constructor({ store, business, chain, clock = Date, notifier = nullNotifier, logger = console, publicBaseUrl = 'http://localhost:8402', payoutAddress = null, agenda = new LocalAgenda() }) {
+    this.agenda = agenda;
     this.store = store;
     this.business = business;
     this.chain = chain;
@@ -99,6 +103,134 @@ export class SenaAgent {
       if (this.listSlots({ dateStr: d }).length > 0) days.push(d);
     }
     return days;
+  }
+
+  // --- Agenda externa (Google Calendar) ----------------------------------------
+  // Con la agenda local (por defecto) estas funciones devuelven lo mismo que las síncronas de arriba.
+  // Con una agenda externa consultan el calendario del comercio, y si no se puede leer, fallan
+  // de forma segura: AgendaError al listar, y código "agenda_no_disponible" al reservar o cobrar.
+
+  /** Turnos de un día, descontando lo que ya ocupa el calendario del comercio. Tira AgendaError si no se puede leer. */
+  async listSlotsChecked({ dateStr, onlyFree = false } = {}) {
+    const slots = this.listSlots({ dateStr, onlyFree: false });
+    if (this.agenda.external && slots.length > 0) {
+      const events = await this.agenda.events({ fromMs: Math.min(...slots.map((s) => s.startAt)), toMs: Math.max(...slots.map((s) => s.startAt)) + this.business.duracionMinutos * MINUTE });
+      for (const s of slots) {
+        if (s.free && !this.slotFreeIn(events, s.resource, s.startAt)) { s.free = false; s.agendaBusy = true; }
+      }
+    }
+    return onlyFree ? slots.filter((s) => s.free) : slots;
+  }
+
+  slotFreeIn(events, resource, startAt, ignoreBookingId = null) {
+    return slotIsFreeIn(ignoreBookingId ? events.filter((e) => e.bookingId !== ignoreBookingId) : events, {
+      resource, startAt, durationMin: this.business.duracionMinutos, resources: this.business.recursos,
+    });
+  }
+
+  /** Lee el calendario justo para un turno. Tira AgendaError si no se puede. */
+  async slotFreeInAgenda(resource, startAt, ignoreBookingId = null) {
+    if (!this.agenda.external) return true;
+    const events = await this.agenda.events({ fromMs: startAt, toMs: startAt + this.business.duracionMinutos * MINUTE });
+    return this.slotFreeIn(events, resource, startAt, ignoreBookingId);
+  }
+
+  /** Como reserve(), pero antes mira que el calendario del comercio tenga libre ese turno. */
+  async reserveChecked(args) {
+    if (this.agenda.external) {
+      const v = this.validateSlot(args.resource, args.startAt);
+      if (!v.ok) return { ok: false, code: 'turno_invalido', reason: v.reason };
+      // Si el turno ya lo tiene una reserva de Seña, que responda reserve() ("ocupado", con lista de espera).
+      if (!this.store.activeBookingForSlot(args.resource, args.startAt)) {
+        try {
+          if (!(await this.slotFreeInAgenda(args.resource, args.startAt))) {
+            return { ok: false, code: 'ocupado_agenda', reason: 'Ese turno ya está ocupado en la agenda del comercio. Elegí otro.' };
+          }
+        } catch (err) {
+          return this.agendaDown('reservar', err);
+        }
+      }
+    }
+    return this.reserve(args);
+  }
+
+  /** Como joinWaitlist(), pero distingue un turno ocupado en el calendario (sin lista de espera) de uno libre. */
+  async joinWaitlistChecked(args) {
+    if (this.agenda.external && !this.store.activeBookingForSlot(args.resource, args.startAt) && this.validateSlot(args.resource, args.startAt).ok) {
+      try {
+        if (!(await this.slotFreeInAgenda(args.resource, args.startAt))) {
+          return { ok: false, code: 'ocupado_agenda', reason: 'Ese turno lo ocupa la agenda del comercio, no una reserva mía, así que no hay lista de espera. Elegí otro.' };
+        }
+      } catch (err) {
+        return this.agendaDown('anotarte en la lista de espera', err);
+      }
+    }
+    return this.joinWaitlist(args);
+  }
+
+  agendaDown(what, err) {
+    this.logger.warn?.(`[agenda] no se pudo ${what}: ${err.message}`);
+    this.log({ kind: 'agenda', rule: 'AGENDA_NO_DISPONIBLE', reason: `No se pudo leer el calendario al intentar ${what}: ${err.message} No se confirma ni se cobra nada.` });
+    return { ok: false, code: 'agenda_no_disponible', reason: AGENDA_DOWN_MESSAGE };
+  }
+
+  /**
+   * Última barrera antes de cobrar: el turno tiene que seguir libre en el calendario del comercio.
+   * Si el calendario no responde, no se cobra.
+   * @returns {Promise<{ ok: true } | { ok: false, status: number, code: string, reason: string }>}
+   */
+  async checkAgendaForPayment(booking) {
+    if (!this.agenda.external || !booking) return { ok: true };
+    try {
+      if (await this.slotFreeInAgenda(booking.resource, booking.start_at, booking.id)) return { ok: true };
+    } catch (err) {
+      const r = this.agendaDown('cobrar una seña', err);
+      return { ok: false, status: 503, code: r.code, reason: r.reason };
+    }
+    this.log({
+      booking_id: booking.id, kind: 'agenda', rule: 'TURNO_OCUPADO_EN_AGENDA',
+      reason: 'El comercio ocupó ese turno en su calendario mientras se pagaba. No se cobra.',
+    });
+    return { ok: false, status: 409, code: 'ocupado_agenda', reason: 'Ese turno acaba de ocuparse en la agenda del comercio. No se cobró nada: elegí otro.' };
+  }
+
+  eventFor(b) {
+    return {
+      title: `${b.resource} · ${b.customer_name ?? 'Cliente'} (seña pagada)`,
+      description: `Reserva ${b.id}. Seña de ${formatArs(b.deposit_wei)} cobrada en wARS por Seña.`,
+      startAt: b.start_at,
+      endAt: b.start_at + this.business.duracionMinutos * MINUTE,
+    };
+  }
+
+  /** Borra el evento de una reserva cancelada. Si falla, el turno queda bloqueado (seguro) y se reintenta solo. */
+  async releaseEvent(b, { quiet = false } = {}) {
+    if (!this.agenda.external) return true;
+    try {
+      await this.agenda.release(b.id);
+      this.log({ booking_id: b.id, kind: 'agenda', rule: 'EVENTO_BORRADO', reason: 'Se borró el turno del calendario del comercio.' });
+      return true;
+    } catch (err) {
+      this.log({ booking_id: b.id, kind: 'agenda', rule: 'AGENDA_PENDIENTE', reason: `No pude borrar el turno del calendario (${err.message}). El turno sigue bloqueado y lo reintento solo.` });
+      if (!quiet) await this.safeNotify(() => this.notifier.toOwner(`⚠️ Se canceló ${b.id} pero no pude borrarlo del calendario (${err.message}). Lo reintento solo; si ves el evento, podés borrarlo a mano.`));
+      return false;
+    }
+  }
+
+  /** Borra del calendario los eventos de reservas que ya están canceladas (por ejemplo, si Google estaba caído al cancelar). */
+  async reconcileAgenda() {
+    if (!this.agenda.external) return { removed: 0 };
+    const now = this.now();
+    const events = await this.agenda.events({ fromMs: now - 24 * 60 * MINUTE, toMs: now + (this.business.diasAdelante + 1) * 24 * 60 * MINUTE });
+    let removed = 0;
+    for (const ev of events) {
+      if (!ev.bookingId) continue;
+      const b = this.store.getBooking(ev.bookingId);
+      // Solo las canceladas: una reserva en curso puede tener el evento recién creado sin confirmar todavía.
+      if (b?.status !== 'cancelled') continue;
+      if (await this.releaseEvent(b, { quiet: true })) removed++;
+    }
+    return { removed };
   }
 
   depositWei() {
@@ -197,21 +329,35 @@ export class SenaAgent {
   async onPaymentSettled({ bookingId, payer, tx, amountWei }) {
     const now = this.now();
     const amount = BigInt(amountWei);
+
+    // Con agenda externa, el turno se anota en el calendario ANTES de confirmarlo en la base.
+    // Si no se puede anotar, la reserva no se confirma y se devuelve todo (el cobro ya salió).
+    let agendaFailure = null;
+    let eventWritten = false;
+    if (this.agenda.external) {
+      const pre = this.store.getBooking(bookingId);
+      if (pre && pre.pay_tx !== tx && this.canConfirmPayment(pre, amount)) {
+        try {
+          await this.agenda.confirm(pre, this.eventFor(pre));
+          eventWritten = true;
+        } catch (err) {
+          agendaFailure = err;
+        }
+      }
+    }
+
     const result = this.store.tx(() => {
       const b = this.store.getBooking(bookingId);
       if (b && b.pay_tx === tx) return { kind: 'repetido', booking: b };
 
-      const canConfirm = b && amount === BigInt(b.deposit_wei) && (
-        b.status === 'held' ||
-        (b.status === 'expired' && !this.store.activeBookingForSlot(b.resource, b.start_at))
-      );
-      if (canConfirm) {
+      if (!agendaFailure && this.canConfirmPayment(b, amount)) {
         const booking = this.store.updateBooking(b.id, {
           status: 'confirmed', payer, pay_tx: tx, paid_at: now, hold_expires_at: null,
         }, now);
         this.log({
           booking_id: b.id, kind: 'cobro', rule: b.status === 'expired' ? 'PAGO_TARDIO_ACEPTADO' : 'SENA_COBRADA',
-          reason: `Seña de ${formatArs(amount)} cobrada en wARS. Turno confirmado.` + (b.status === 'expired' ? ' Llegó después del vencimiento pero el turno seguía libre.' : ''),
+          reason: `Seña de ${formatArs(amount)} cobrada en wARS. Turno confirmado.` + (b.status === 'expired' ? ' Llegó después del vencimiento pero el turno seguía libre.' : '') +
+            (eventWritten ? ' Anotado en el calendario del comercio.' : ''),
           data: { payer }, tx,
         });
         if (b.source === 'lista_espera') {
@@ -221,10 +367,11 @@ export class SenaAgent {
         return { kind: 'confirmado', booking };
       }
       // Pago que no corresponde a una reserva pagable: se devuelve completo.
-      const reason = !b ? 'El pago no corresponde a ninguna reserva.'
-        : amount !== BigInt(b.deposit_wei) ? `El monto pagado (${formatArs(amount)}) no coincide con la seña (${formatArs(b.deposit_wei)}).`
-          : b.status === 'confirmed' ? 'La reserva ya estaba pagada (pago duplicado).'
-            : 'La reserva ya no estaba disponible cuando llegó el pago.';
+      const reason = agendaFailure ? `No pude anotar el turno en el calendario del comercio (${agendaFailure.message}).`
+        : !b ? 'El pago no corresponde a ninguna reserva.'
+          : amount !== BigInt(b.deposit_wei) ? `El monto pagado (${formatArs(amount)}) no coincide con la seña (${formatArs(b.deposit_wei)}).`
+            : b.status === 'confirmed' ? 'La reserva ya estaba pagada (pago duplicado).'
+              : 'La reserva ya no estaba disponible cuando llegó el pago.';
       this.log({ booking_id: b?.id ?? null, kind: 'cobro', rule: 'PAGO_A_DEVOLVER', reason: `${reason} Se devuelve todo.`, data: { payer, amountWei: amount }, tx });
       return { kind: 'devolver', booking: b, reason };
     });
@@ -243,7 +390,21 @@ export class SenaAgent {
       await this.safeNotify(() => this.notifier.toOwner(`↩️ Pago que no correspondía (${result.reason}). Se devuelve ${formatArs(amount)} a ${payer}.`));
     }
     await this.processTransfers();
+    // Si se escribió un evento pero la reserva no se confirmó, el evento sobra: se borra (si falla, reconcileAgenda lo limpia).
+    // Nunca si la reserva quedó confirmada (otro pago concurrente la confirmó y el evento es el suyo).
+    if (result.kind === 'devolver' && (eventWritten || agendaFailure) && result.booking
+      && this.store.getBooking(result.booking.id)?.status !== 'confirmed') {
+      try { await this.agenda.release(result.booking.id); } catch { /* lo limpia reconcileAgenda si la reserva quedó cancelada */ }
+    }
     return result;
+  }
+
+  /** ¿Este pago confirma esta reserva? (monto exacto y turno todavía libre) */
+  canConfirmPayment(b, amount) {
+    return Boolean(b) && amount === BigInt(b.deposit_wei) && (
+      b.status === 'held' ||
+      (b.status === 'expired' && !this.store.activeBookingForSlot(b.resource, b.start_at))
+    );
   }
 
   // --- Cancelar ---------------------------------------------------------------
@@ -296,6 +457,7 @@ export class SenaAgent {
       });
     }
     await this.safeNotify(() => this.notifier.toOwner(`❌ Cancelación ${b.id} (${d.rule}): ${d.reason}`));
+    await this.releaseEvent(b);
     if (d.offerToWaitlist) await this.offerSlot(b.resource, b.start_at);
     await this.processTransfers();
     return { ok: true, refundWei: d.refundWei, rule: d.rule, reason: d.reason, transfer };

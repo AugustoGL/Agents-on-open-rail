@@ -5,6 +5,8 @@ import { loadConfig } from './config.js';
 import { openDb } from './db.js';
 import { createLiveChain, createMockChain } from './chain.js';
 import { SenaAgent } from './agent.js';
+import { LocalAgenda } from './agenda.js';
+import { GoogleCalendarAgenda } from './google-calendar.js';
 import { createFacilitatorClient, createPaymentServer, MockFacilitator } from './x402.js';
 import { createApp } from './server.js';
 import { createBot, consoleNotifier } from './bot.js';
@@ -26,10 +28,29 @@ async function main() {
     ? createLiveChain({ privateKey: cfg.agentPrivateKey, rpcUrl: cfg.rpcUrl, tag: cfg.attributionTag, feeCurrency: cfg.feeCurrency, logger })
     : createMockChain({ logger });
 
+  // Agenda: la grilla propia (por defecto) o el Google Calendar del comercio. Si la configuración de Google
+  // está a medias se usa la propia; si está completa pero no se puede leer, no arranca (mejor eso que
+  // ignorar el calendario real del comercio y dejar doble reservas).
+  let agenda = new LocalAgenda();
+  if (cfg.googleServiceAccountPath && cfg.googleCalendarId) {
+    agenda = GoogleCalendarAgenda.fromFile(cfg.googleServiceAccountPath, { calendarId: cfg.googleCalendarId, utcOffsetMinutes: cfg.business.utcOffsetMinutos });
+  } else if (cfg.googleServiceAccountPath || cfg.googleCalendarId) {
+    logger.warn('Google Calendar a medias: hacen falta GOOGLE_SERVICE_ACCOUNT_JSON_PATH y GOOGLE_CALENDAR_ID. Uso la grilla propia.');
+  }
+
   const agent = new SenaAgent({
     store, business: cfg.business, chain, notifier: consoleNotifier(logger), logger,
-    publicBaseUrl: cfg.publicBaseUrl, payoutAddress: cfg.payoutAddress,
+    publicBaseUrl: cfg.publicBaseUrl, payoutAddress: cfg.payoutAddress, agenda,
   });
+  if (agenda.external) {
+    logger.info(`Agenda: Google Calendar (${cfg.googleCalendarId})`);
+    const now = Date.now();
+    agenda.events({ fromMs: now, toMs: now + 3_600_000 })
+      .then(() => logger.info('Agenda: acceso al calendario verificado.'))
+      .catch((err) => logger.warn(`Agenda: NO puedo leer el calendario (${err.message}). No se van a confirmar reservas hasta que funcione.`));
+  } else {
+    logger.info('Agenda: grilla propia (config/negocio.json).');
+  }
 
   // Si el proceso se cortó en medio de una transferencia, no se sabe si salió: queda para revisar.
   for (const t of store.transfersByStatus('sending')) {
@@ -74,6 +95,7 @@ async function main() {
   // El retiro tiene clave idempotente por día, así que reintentar nunca paga dos veces.
   let lastClose = null;
   let lastCloseAttempt = 0;
+  let lastReconcile = 0;
   const shortErr = (err) => err?.shortMessage ?? err?.message ?? String(err);
   const tick = async () => {
     try {
@@ -83,6 +105,16 @@ async function main() {
       logger.error(`[tareas] ${shortErr(err)}`);
     }
     const now = Date.now();
+    // Con Google Calendar: borrar del calendario los turnos cancelados cuyo evento no se pudo borrar antes.
+    if (agent.agenda.external && now - lastReconcile > 10 * 60_000) {
+      lastReconcile = now;
+      try {
+        const { removed } = await agent.reconcileAgenda();
+        if (removed) logger.info(`[agenda] se borraron ${removed} eventos de reservas canceladas.`);
+      } catch (err) {
+        logger.warn(`[agenda] no pude conciliar el calendario: ${shortErr(err)}`);
+      }
+    }
     const today = localDateStr(now, agent.offset);
     if (localTimeStr(now, agent.offset) >= cfg.closeTime && lastClose !== today && now - lastCloseAttempt > 5 * 60_000) {
       lastCloseAttempt = now;

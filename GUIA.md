@@ -13,12 +13,12 @@ Todo en Linux, desde la terminal. Andá en orden: hasta el paso 6 **no se mueve 
 ## 0. Qué hay en el zip
 
 ```
-src/        el agente (reglas, cobros x402, cadena, bot de Telegram, API)
+src/        el agente (reglas, cobros x402, cadena, agenda/Google Calendar, bot de Telegram, API)
 web/        código de la página de pago (se compila a public/pay.bundle.js, ya viene compilada)
 public/     página /pagar/<reserva> que abre el cliente
 config/     negocio.json: canchas, horarios, precio, política de cancelación
 scripts/    herramientas: saldo, chequeos, registro ERC-8004, verificar tag, comprador de prueba, demo
-test/       48 pruebas automáticas
+test/       70 pruebas automáticas
 agent.json  ficha de identidad ERC-8004 (se publica en GitHub)
 ```
 
@@ -56,7 +56,7 @@ Después:
 
 ```bash
 npm install
-npm test        # tiene que terminar con "pass 48" y "fail 0"
+npm test        # tiene que terminar con "pass 70" y "fail 0"
 npm run demo    # cuenta la historia completa con plata simulada
 ```
 
@@ -203,6 +203,36 @@ Si un pago falla con un error del facilitador sobre extensiones, probá `X402_BU
 
 Todo está en `config/negocio.json`: nombre, canchas, horarios, precio (`precioTurnoArs`), porcentaje de seña, horas de la política de cancelación, topes de devoluciones automáticas. Reiniciá después de cambiarlo. Para no gastar mucho en pruebas podés bajar el precio (ej. `precioTurnoArs: 400` → seña de $100).
 
+## 12. Conectar el Google Calendar del comercio (opcional)
+
+Seña es la puerta de pago: el comercio sigue usando su calendario y Seña lo lee (qué está libre) y lo escribe (cada turno pagado). Sin esto, Seña usa su grilla propia y todo funciona igual que hasta acá.
+
+**Una sola vez, en Google:**
+
+1. Entrá a **console.cloud.google.com** y creá un proyecto (por ejemplo "Seña").
+2. **APIs y servicios → Biblioteca →** buscá **Google Calendar API → Habilitar**.
+3. **IAM y administración → Cuentas de servicio → Crear cuenta de servicio** (nombre: "sena"; no hace falta darle roles). Copiá el **email** de la cuenta (termina en `.iam.gserviceaccount.com`).
+4. En esa cuenta: **Claves → Agregar clave → Crear clave nueva → JSON**. Se baja un archivo. **Es secreto**: guardalo en `secrets/` dentro del repo (esa carpeta ya está en `.gitignore`), por ejemplo `secrets/google-sena.json`. No lo pegues en ningún chat.
+5. Abrí **Google Calendar** con la cuenta del comercio. En el calendario de las canchas: **Configuración y uso compartido → Compartir con personas específicas → Agregar personas** y pegá el email del paso 3 con el permiso **"Hacer cambios en los eventos"**.
+6. En esa misma pantalla, bajá hasta **Integrar el calendario** y copiá el **ID del calendario** (algo como `abc123@group.calendar.google.com`, o el mail si es el calendario principal).
+
+**En el `.env`:**
+
+```
+GOOGLE_SERVICE_ACCOUNT_JSON_PATH=secrets/google-sena.json
+GOOGLE_CALENDAR_ID=abc123@group.calendar.google.com
+```
+
+Reiniciá `npm start`. Tiene que decir `Agenda: Google Calendar (...)` y después `Agenda: acceso al calendario verificado.` Si dice que no puede leerlo, casi siempre es el paso 5 (calendario sin compartir) o que la API del paso 2 no está habilitada. Si falta alguna de las dos variables, Seña usa la grilla propia.
+
+**Cómo se interpreta el calendario:**
+
+- **Un solo calendario para todas las canchas.** Cada evento tiene que **nombrar la cancha en el título o en el lugar**: `Cancha 1 - Pérez`. Un evento que no nombra ninguna cancha (`Torneo`, `Feriado`) ocupa **todas**.
+- Los eventos "de día completo" ocupan todo el día. Los marcados como "Disponible" (transparentes) y los cancelados no cuentan.
+- Los horarios que ofrece Seña siguen saliendo de `config/negocio.json` (grilla, duración, anticipación); el calendario solo dice qué está ocupado.
+- Los turnos pagados aparecen como `Cancha 1 · Nombre (seña pagada)`. **No los muevas ni los borres a mano**: si cancelás desde el calendario, la seña no se devuelve (cancelá desde Telegram o la API).
+- Si Google falla, Seña no confirma ni cobra, y te avisa. Si falla al cancelar, devuelve la seña igual y reintenta borrar el evento sola cada 10 minutos.
+
 ## Problemas comunes
 
 | Mensaje | Qué hacer |
@@ -215,6 +245,7 @@ Todo está en `config/negocio.json`: nombre, canchas, horarios, precio (`precioT
 | El link de pago sale como texto | Falta https (paso 9) |
 | "No te alcanza el saldo de wARS" | La wallet que paga necesita wARS (Ripio) |
 | Una devolución quedó "pendiente" | Superó un tope: `/pendientes` y `/aprobar <n>` |
+| "No puedo ver el calendario del comercio" | Falló Google Calendar: sección 12 (¿compartiste el calendario con la cuenta de servicio?). Mientras tanto no se confirma ni se cobra nada |
 | Una transferencia quedó "dudosa" | No se reintenta sola a propósito: mirá el hash en Celoscan antes de aprobar |
 
 ## Para preguntar en office hours

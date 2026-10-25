@@ -48,6 +48,9 @@ export function loadConfig() {
     anthropicModel: env('ANTHROPIC_MODEL', 'claude-haiku-5-5'),
     closeTime: env('CIERRE_HORA', '23:30'),
     erc8004AgentId: env('ERC8004_AGENT_ID'),
+    // Agenda en Google Calendar: si falta alguna de las dos variables se usa la grilla propia (modo por defecto).
+    googleServiceAccountPath: env('GOOGLE_SERVICE_ACCOUNT_JSON_PATH'),
+    googleCalendarId: env('GOOGLE_CALENDAR_ID'),
     repoUrl: env('REPO_URL', 'https://github.com/AugustoGL/Agents-on-open-rail'),
     business: loadBusiness(),
   };

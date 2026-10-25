@@ -11,6 +11,8 @@ import { isAddress, getAddress } from 'viem';
 import { formatArs, weiToArsString } from './money.js';
 import { localToUtcMs } from './time.js';
 import { WARS, CELO_NETWORK } from './constants.js';
+import { AgendaError } from './agenda.js';
+import { AGENDA_DOWN_MESSAGE } from './agent.js';
 
 const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 
@@ -52,7 +54,7 @@ export function createApp({ agent, payments, registration = {}, logger = console
   app.use(express.json({ limit: '32kb' }));
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, negocio: agent.business.nombre, wallet: agent.chain.address, modo: agent.chain.mode });
+    res.json({ ok: true, negocio: agent.business.nombre, wallet: agent.chain.address, modo: agent.chain.mode, agenda: agent.agenda.name });
   });
 
   app.get('/api/negocio', (_req, res) => {
@@ -78,22 +80,35 @@ export function createApp({ agent, payments, registration = {}, logger = console
     });
   });
 
-  app.get('/api/turnos', (req, res) => {
-    const fecha = typeof req.query.fecha === 'string' ? req.query.fecha : undefined;
-    if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return res.status(400).json({ error: 'fecha tiene que ser YYYY-MM-DD' });
-    const dias = agent.bookableDays();
-    const dia = fecha ?? dias.find((d) => agent.listSlots({ dateStr: d, onlyFree: true }).length > 0) ?? dias[0];
-    const slots = agent.listSlots({ dateStr: dia, onlyFree: req.query.libres !== 'no' });
-    res.json({
-      fecha: dia ?? null,
-      sena: formatArs(agent.depositWei()),
-      turnos: slots.map((s) => ({ recurso: s.resource, inicio: new Date(s.startAt).toISOString(), hora: s.time, libre: s.free })),
-      diasDisponibles: dias,
-    });
+  app.get('/api/turnos', async (req, res, next) => {
+    try {
+      const fecha = typeof req.query.fecha === 'string' ? req.query.fecha : undefined;
+      if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return res.status(400).json({ error: 'fecha tiene que ser YYYY-MM-DD' });
+      const dias = agent.bookableDays();
+      let dia = fecha;
+      if (!dia) {
+        for (const d of dias) {
+          if ((await agent.listSlotsChecked({ dateStr: d, onlyFree: true })).length > 0) { dia = d; break; }
+        }
+        dia ??= dias[0];
+      }
+      const slots = await agent.listSlotsChecked({ dateStr: dia, onlyFree: req.query.libres !== 'no' });
+      return res.json({
+        fecha: dia ?? null,
+        sena: formatArs(agent.depositWei()),
+        turnos: slots.map((s) => ({ recurso: s.resource, inicio: new Date(s.startAt).toISOString(), hora: s.time, libre: s.free })),
+        diasDisponibles: dias,
+      });
+    } catch (err) {
+      if (err instanceof AgendaError) return res.status(503).json({ error: AGENDA_DOWN_MESSAGE, codigo: 'agenda_no_disponible' });
+      return next(err);
+    }
   });
 
   // Reservar desde otro agente o desde la web. Devuelve un token de cliente para poder cancelar después.
-  app.post('/api/reservas', (req, res) => {
+  const statusOf = { ocupado: 409, ocupado_agenda: 409, muchas_reservas: 429, agenda_no_disponible: 503 };
+  app.post('/api/reservas', async (req, res, next) => {
+    try {
     const body = req.body ?? {};
     const startAt = parseStart(body, agent);
     if (!body.recurso || startAt == null) {
@@ -104,12 +119,10 @@ export function createApp({ agent, payments, registration = {}, logger = console
       ? body.cliente.token
       : `api:${randomBytes(16).toString('hex')}`;
     const customer = { id: token, name: String(body.cliente?.nombre ?? 'Cliente API').slice(0, 60), channel: 'api', wallet };
-    const r = agent.reserve({ resource: body.recurso, startAt, customer });
-    if (!r.ok) {
-      const status = r.code === 'ocupado' ? 409 : r.code === 'muchas_reservas' ? 429 : 400;
-      return res.status(status).json({ error: r.reason, codigo: r.code });
-    }
-    res.status(201).json({ reserva: publicBooking(agent, r.booking), clienteToken: token });
+    const r = await agent.reserveChecked({ resource: body.recurso, startAt, customer });
+    if (!r.ok) return res.status(statusOf[r.code] ?? 400).json({ error: r.reason, codigo: r.code });
+    return res.status(201).json({ reserva: publicBooking(agent, r.booking), clienteToken: token });
+    } catch (err) { return next(err); }
   });
 
   app.get('/api/reservas/:id', (req, res) => {
@@ -128,21 +141,30 @@ export function createApp({ agent, payments, registration = {}, logger = console
     } catch (err) { next(err); }
   });
 
-  app.post('/api/reservas/:id/lista-espera', (req, res) => {
-    const b = agent.store.getBooking(req.params.id);
-    const token = req.body?.clienteToken;
-    if (!b || typeof token !== 'string') return res.status(400).json({ error: 'Falta la reserva o el clienteToken.' });
-    const r = agent.joinWaitlist({ resource: b.resource, startAt: b.start_at, customer: { id: token, name: 'Cliente API', channel: 'api' } });
-    if (!r.ok) return res.status(409).json({ error: r.reason });
-    res.json({ ok: true, puesto: r.position });
+  app.post('/api/reservas/:id/lista-espera', async (req, res, next) => {
+    try {
+      const b = agent.store.getBooking(req.params.id);
+      const token = req.body?.clienteToken;
+      if (!b || typeof token !== 'string') return res.status(400).json({ error: 'Falta la reserva o el clienteToken.' });
+      const r = await agent.joinWaitlistChecked({ resource: b.resource, startAt: b.start_at, customer: { id: token, name: 'Cliente API', channel: 'api' } });
+      if (!r.ok) return res.status(statusOf[r.code] ?? 409).json({ error: r.reason, codigo: r.code });
+      return res.json({ ok: true, puesto: r.position });
+    } catch (err) { return next(err); }
   });
 
   // --- Cobro x402 ---------------------------------------------------------------
   // 1) Antes de pedir el pago: si la reserva no se puede pagar, se corta acá y nadie firma nada.
-  app.post('/api/reservas/:id/pagar', (req, res, next) => {
-    const check = agent.checkPayable(req.params.id);
-    if (check.ok || (req.get('payment-signature') && agent.canAcceptLatePayment(req.params.id))) return next();
-    return res.status(check.status).json({ error: check.reason, codigo: check.code, reserva: check.booking ? publicBooking(agent, check.booking) : null });
+  app.post('/api/reservas/:id/pagar', async (req, res, next) => {
+    try {
+      const check = agent.checkPayable(req.params.id);
+      if (check.ok || (req.get('payment-signature') && agent.canAcceptLatePayment(req.params.id))) {
+        // Con agenda externa, el turno tiene que seguir libre en el calendario y el calendario tiene que responder.
+        const agenda = await agent.checkAgendaForPayment(check.booking ?? agent.store.getBooking(req.params.id));
+        if (agenda.ok) return next();
+        return res.status(agenda.status).json({ error: agenda.reason, codigo: agenda.code });
+      }
+      return res.status(check.status).json({ error: check.reason, codigo: check.code, reserva: check.booking ? publicBooking(agent, check.booking) : null });
+    } catch (err) { return next(err); }
   });
   // 2) x402: responde 402 con el precio en wARS, verifica la firma y liquida con el facilitador.
   if (payments) app.use(paymentMiddleware(payments.routes, payments.server, undefined, undefined, syncFacilitatorOnStart));
@@ -185,8 +207,8 @@ export function buildRegistration({ agent, agentId, repoUrl, imageUrl }) {
   const reg = {
     type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
     name: `Seña · ${agent.business.nombre}`,
-    description: 'Agente que cobra señas de turnos en wARS (peso argentino de Ripio) sobre Celo por x402 y decide solo qué hacer con cada cancelación: devuelve, retiene o reubica el turno con la lista de espera.' +
-      (agent.business.esDemostracion ? ' Comercio de demostración.' : ''),
+    description: 'La puerta x402 para que el agente de un cliente reserve y pague en un comercio que ya tiene su sistema de turnos: cobra la seña en wARS (peso argentino de Ripio) sobre Celo, deja el turno anotado en el calendario del comercio y decide solo qué hacer con cada cancelación (devolver, retener o reubicar con la lista de espera). Complementa la agenda del comercio, no la reemplaza.' +
+      (agent.business.esDemostracion ? ' Comercio de demostración: los turnos y precios son de ejemplo; agentes de otros participantes pueden reservar por API.' : ''),
     services: [
       { name: 'web', endpoint: base },
       { name: 'x402', endpoint: `${base}/api/reservas/{id}/pagar`, version: '2' },
