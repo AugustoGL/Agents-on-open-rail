@@ -7,7 +7,7 @@ import { paymentMiddleware } from '@x402/express';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import { isAddress, getAddress } from 'viem';
+import { isAddress, getAddress, verifyMessage } from 'viem';
 import { formatArs, weiToArsString } from './money.js';
 import { localToUtcMs, localDateStr } from './time.js';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
@@ -64,7 +64,7 @@ function parseStart(body, agent) {
  */
 export function createApp({
   agent, payments, registration = {}, logger = console, syncFacilitatorOnStart = true,
-  dashboardPassword, trustProxy = false, createLimit = { windowMs: 10 * 60_000, max: 30 }, panelOptions = {},
+  dashboardPassword, trustProxy = false, createLimit = { windowMs: 10 * 60_000, max: 30 }, panelOptions = {}, walletOptions = {},
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -231,6 +231,96 @@ export function createApp({
     const p = agent.previewCancel({ bookingId: req.params.id, customerId: token });
     if (!p.ok) return res.status(409).json({ error: p.reason });
     return res.json({ ok: true, devolucion: formatArs(p.refundWei), regla: p.rule, motivo: p.reason, reserva: publicBooking(agent, p.booking) });
+  });
+
+  // --- Ver y cancelar reservas con la billetera -----------------------------------------------------
+  // La persona firma un mensaje de un solo uso (no cuesta gas ni mueve plata) y demuestra que la billetera es suya:
+  // recién ahí se le muestran las reservas que pagó desde esa dirección. Conectar la billetera sola no alcanza,
+  // porque las direcciones son públicas y cualquiera podría escribir la de otra persona.
+  const { now: ahora = Date.now, ttlDesafioMs = 5 * 60_000, ttlSesionMs = 15 * 60_000 } = walletOptions;
+  const desafios = new Map(); // código -> { direccion, expira, mensaje }
+  const sesiones = new Map(); // sesión -> { direccion, expira }
+  const barrer = (mapa) => { const t = ahora(); for (const [k, v] of mapa) if (v.expira <= t) mapa.delete(k); };
+  const mensajeDeFirma = ({ direccion, host, nonce, expira }) => [
+    'Seña · Ver mis reservas',
+    '',
+    'Firmá para demostrar que esta billetera es tuya y ver tus reservas.',
+    'Firmar no cuesta nada ni mueve plata.',
+    '',
+    `Billetera: ${direccion}`,
+    `Sitio: ${host}`,
+    `Código: ${nonce}`,
+    `Vence: ${new Date(expira).toISOString()}`,
+  ].join('\n');
+  const sesionDe = (req) => {
+    const s = typeof req.body?.sesion === 'string' ? sesiones.get(req.body.sesion) : null;
+    return s && s.expira > ahora() ? s : null;
+  };
+  const sinSesion = (res) => res.status(401).json({ error: 'Pasó mucho tiempo. Volvé a conectar tu billetera para ver tus reservas.', codigo: 'sin_sesion' });
+  const suyas = (s) => agent.store.bookingsForPayer(s.direccion).map((b) => publicBooking(agent, b));
+
+  app.post('/api/billetera/desafio', limitCreates, (req, res) => {
+    const dir = req.body?.direccion;
+    if (typeof dir !== 'string' || !isAddress(dir)) return res.status(400).json({ error: 'La dirección de la billetera no es válida.' });
+    barrer(desafios);
+    const direccion = getAddress(dir);
+    const nonce = randomBytes(16).toString('hex');
+    const expira = ahora() + ttlDesafioMs;
+    const mensaje = mensajeDeFirma({ direccion, host: req.get('host'), nonce, expira });
+    desafios.set(nonce, { direccion, expira, mensaje });
+    return res.json({ nonce, mensaje, expira: new Date(expira).toISOString() });
+  });
+
+  app.post('/api/billetera/reservas', limitCreates, async (req, res, next) => {
+    try {
+      const { direccion, nonce, firma } = req.body ?? {};
+      if (typeof direccion !== 'string' || !isAddress(direccion) || typeof nonce !== 'string' || !/^[a-f0-9]{32}$/.test(nonce) || typeof firma !== 'string' || !/^0x[a-fA-F0-9]{130,}$/.test(firma) || firma.length > 600) {
+        return res.status(400).json({ error: 'Faltan datos para verificar la billetera.' });
+      }
+      const d = desafios.get(nonce);
+      desafios.delete(nonce); // de un solo uso, aunque la firma salga mal
+      if (!d || d.expira <= ahora() || d.direccion !== getAddress(direccion)) {
+        return res.status(401).json({ error: 'El pedido venció o no es válido. Volvé a conectar tu billetera.', codigo: 'desafio' });
+      }
+      const ok = await verifyMessage({ address: d.direccion, message: d.mensaje, signature: firma }).catch(() => false);
+      if (!ok) return res.status(401).json({ error: 'La firma no corresponde a esa billetera.', codigo: 'firma' });
+      barrer(sesiones);
+      const sesion = randomBytes(24).toString('hex');
+      const expira = ahora() + ttlSesionMs;
+      sesiones.set(sesion, { direccion: d.direccion, expira });
+      return res.json({ direccion: d.direccion, sesion, venceEl: new Date(expira).toISOString(), reservas: suyas({ direccion: d.direccion }) });
+    } catch (err) { return next(err); }
+  });
+
+  app.post('/api/billetera/mis-reservas', (req, res) => {
+    const s = sesionDe(req);
+    if (!s) return sinSesion(res);
+    return res.json({ direccion: s.direccion, reservas: suyas(s) });
+  });
+
+  const propia = (req, res) => {
+    const s = sesionDe(req);
+    if (!s) { sinSesion(res); return null; }
+    const b = agent.store.getBooking(req.params.id);
+    // Sin pista de si la reserva existe pero es de otra persona.
+    if (!b || !b.payer || b.payer.toLowerCase() !== s.direccion.toLowerCase()) { res.status(404).json({ error: 'No encontramos esa reserva en tu billetera.' }); return null; }
+    return b;
+  };
+  app.post('/api/billetera/reservas/:id/cancelar-vista', (req, res) => {
+    const b = propia(req, res);
+    if (!b) return undefined;
+    const p = agent.previewCancel({ bookingId: b.id });
+    if (!p.ok) return res.status(409).json({ error: p.reason });
+    return res.json({ ok: true, devolucion: formatArs(p.refundWei), regla: p.rule, motivo: p.reason, reserva: publicBooking(agent, p.booking) });
+  });
+  app.post('/api/billetera/reservas/:id/cancelar', limitCreates, async (req, res, next) => {
+    try {
+      const b = propia(req, res);
+      if (!b) return undefined;
+      const r = await agent.cancel({ bookingId: b.id, by: 'wallet' });
+      if (!r.ok) return res.status(409).json({ error: r.reason });
+      return res.json({ ok: true, regla: r.rule, motivo: r.reason, devolucion: formatArs(r.refundWei) });
+    } catch (err) { return next(err); }
   });
 
   // --- Cobro x402 ---------------------------------------------------------------

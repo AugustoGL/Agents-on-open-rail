@@ -3,7 +3,7 @@
 // Todo lo que viene del servidor entra como texto (nunca como HTML).
 import {
   h, $, setChildren, request, storage, safeHref, ahoraServidor, fmtFecha, partesDia, carteles, barraCliente,
-  aviso, esqueletos, vacio, estadoEtiqueta,
+  aviso, esqueletos, vacio, estadoEtiqueta, icono, abreviar,
 } from '/static/dom.js';
 
 const TOKEN_KEY = 'sena_token';
@@ -12,7 +12,12 @@ const CONTACT_KEY = 'sena_contacto';
 const TOKEN_RE = /^api:[a-f0-9]{32}$/;
 const BOOKING_RE = /^S-[A-Z0-9]{6}$/;
 
-const S = { negocio: null, dias: [], dia: null, turnos: [], seleccion: null, enviando: false, mias: { reservas: [], esperas: [] }, confirmando: null, mensaje: null };
+const S = {
+  negocio: null, dias: [], dia: null, turnos: [], seleccion: null, enviando: false, mias: { reservas: [], esperas: [] }, confirmando: null, mensaje: null,
+  // Con la billetera: la firma de un mensaje demuestra que es tuya y muestra las reservas que pagaste desde ella.
+  bill: { sesion: null, direccion: null, reservas: [], ids: new Set(), conectando: false, mensaje: null },
+};
+const BILL_KEY = 'sena_billetera';
 const token = () => { const t = storage.get(TOKEN_KEY); return t && TOKEN_RE.test(t) ? t : null; };
 const errorDeRed = (err) => (err.status ? err.message : 'No pudimos conectarnos. Revisá tu conexión y probá de nuevo.');
 
@@ -35,6 +40,8 @@ async function init() {
   $('#f-contacto').value = storage.get(CONTACT_KEY) ?? '';
   $('#f').addEventListener('submit', enviar);
   $('#f-cancelar').addEventListener('click', () => { S.seleccion = null; renderFormulario(); renderTurnos(); });
+  renderBilletera();
+  restaurarBilletera();
   await Promise.all([cargarDias(), cargarMias().catch(() => renderMias())]);
   setInterval(() => { if (!document.hidden && !S.enviando && !S.confirmando) cargarMias().catch(() => {}); }, 30_000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !S.confirmando) cargarMias().catch(() => {}); });
@@ -201,15 +208,23 @@ async function enviar(e) {
 
 async function cargarMias() {
   const t = token();
-  if (!t) { S.mias = { reservas: [], esperas: [] }; renderMias(); return; }
-  S.mias = await request('POST', '/api/mis-reservas', { clienteToken: t });
+  if (!t) S.mias = { reservas: [], esperas: [] };
+  else S.mias = await request('POST', '/api/mis-reservas', { clienteToken: t });
+  if (S.bill.sesion) await refrescarBilletera();
   renderMias();
+}
+
+/** Las reservas del navegador y las de la billetera juntas, sin repetir. */
+function todas() {
+  const ids = new Set(S.mias.reservas.map((b) => b.id));
+  return [...S.mias.reservas, ...S.bill.reservas.filter((b) => !ids.has(b.id))].sort((a, b) => Date.parse(b.inicio) - Date.parse(a.inicio));
 }
 
 const minutosRestantes = (iso) => Math.max(0, Math.ceil((Date.parse(iso) - ahoraServidor()) / 60000));
 
 function renderMias() {
-  const { reservas, esperas } = S.mias;
+  const reservas = todas();
+  const { esperas } = S.mias;
   const vigentes = reservas.filter((b) => b.estado === 'held' || b.estado === 'confirmed');
   const anteriores = reservas.filter((b) => !vigentes.includes(b));
   const nodes = [S.mensaje];
@@ -262,10 +277,16 @@ function tarjeta(b) {
   return card;
 }
 
+/** Cancela (o muestra qué devolvería) por la billetera si la reserva se pagó desde la conectada, y si no por el navegador. */
+function pedirCancelacion(id, accion) {
+  if (S.bill.ids.has(id)) return request('POST', `/api/billetera/reservas/${id}/${accion}`, { sesion: S.bill.sesion }).catch(sesionVencida);
+  return request('POST', `/api/reservas/${id}/${accion}`, { clienteToken: token() });
+}
+
 async function previsualizar(id) {
   S.mensaje = null;
   try {
-    const p = await request('POST', `/api/reservas/${id}/cancelar-vista`, { clienteToken: token() });
+    const p = await pedirCancelacion(id, 'cancelar-vista');
     S.confirmando = { id, ok: true, devolucion: p.devolucion, regla: p.regla, motivo: p.motivo };
   } catch (err) {
     S.confirmando = { id, ok: false, motivo: errorDeRed(err) };
@@ -278,7 +299,7 @@ async function cancelar(id) {
   S.confirmando = { ...S.confirmando, enviando: true };
   renderMias();
   try {
-    const r = await request('POST', `/api/reservas/${id}/cancelar`, { clienteToken: token() });
+    const r = await pedirCancelacion(id, 'cancelar');
     S.mensaje = aviso('ok', h('strong', {}, 'Reserva cancelada.'), r.motivo, r.devolucion && r.devolucion !== '$ 0' ? ` Te devolvemos ${r.devolucion}: llega a la misma billetera con la que pagaste.` : '');
   } catch (err) {
     S.mensaje = aviso('error', h('strong', {}, 'No se pudo cancelar'), errorDeRed(err));
@@ -287,6 +308,100 @@ async function cancelar(id) {
     S.enviando = false;
   }
   await Promise.all([cargarMias().catch(() => renderMias()), refrescarTurnos()]);
+}
+
+// --- Ver mis reservas con la billetera ----------------------------------------------------------------------------------
+
+const aHex = (texto) => `0x${[...new TextEncoder().encode(texto)].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+
+function sesionVencida(err) {
+  if (err.data?.codigo === 'sin_sesion') {
+    desconectarBilletera();
+    S.bill.mensaje = aviso('atencion', h('strong', {}, 'Pasó mucho tiempo'), 'Por seguridad, la conexión con tu billetera dura unos minutos. Volvé a conectarla para ver tus reservas.');
+    renderBilletera(); renderMias();
+  }
+  throw err;
+}
+
+function guardarBilletera() {
+  try { sessionStorage.setItem(BILL_KEY, JSON.stringify({ sesion: S.bill.sesion, direccion: S.bill.direccion })); } catch { /* sin almacenamiento: se pide de nuevo */ }
+}
+
+function aplicarBilletera(r) {
+  S.bill.direccion = r.direccion;
+  S.bill.reservas = r.reservas;
+  S.bill.ids = new Set(r.reservas.map((b) => b.id));
+  if (r.sesion) S.bill.sesion = r.sesion;
+}
+
+function desconectarBilletera() {
+  S.bill = { sesion: null, direccion: null, reservas: [], ids: new Set(), conectando: false, mensaje: null };
+  try { sessionStorage.removeItem(BILL_KEY); } catch { /* nada */ }
+}
+
+async function refrescarBilletera() {
+  try {
+    aplicarBilletera(await request('POST', '/api/billetera/mis-reservas', { sesion: S.bill.sesion }));
+  } catch (err) {
+    if (err.data?.codigo === 'sin_sesion') { try { sesionVencida(err); } catch { /* ya se avisó en pantalla */ } }
+  }
+}
+
+async function restaurarBilletera() {
+  try {
+    const g = JSON.parse(sessionStorage.getItem(BILL_KEY) ?? 'null');
+    if (!g?.sesion) return;
+    S.bill.sesion = g.sesion; S.bill.direccion = g.direccion;
+    await refrescarBilletera();
+  } catch { desconectarBilletera(); }
+  renderBilletera(); renderMias();
+}
+
+function mensajeDeFirma(err) {
+  if (err?.code === 4001 || /user rejected|user denied|rejected the request/i.test(err?.message ?? '')) return aviso('info', h('strong', {}, 'No firmaste'), 'No pasó nada ni se cobró nada. Podés intentar de nuevo cuando quieras.');
+  if (err?.code === -32002) return aviso('atencion', h('strong', {}, 'Tu billetera tiene un pedido abierto'), 'Abrila y respondé ese pedido primero.');
+  return aviso('error', h('strong', {}, 'No pudimos verificar tu billetera'), err.status ? err.message : (err?.message ?? 'Probá de nuevo.'));
+}
+
+async function conectarBilletera() {
+  S.bill.conectando = true; S.bill.mensaje = null; renderBilletera();
+  try {
+    const [cuenta] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const d = await request('POST', '/api/billetera/desafio', { direccion: cuenta });
+    const firma = await window.ethereum.request({ method: 'personal_sign', params: [aHex(d.mensaje), cuenta] });
+    aplicarBilletera(await request('POST', '/api/billetera/reservas', { direccion: cuenta, nonce: d.nonce, firma }));
+    guardarBilletera();
+    S.bill.mensaje = null;
+  } catch (err) {
+    S.bill.mensaje = mensajeDeFirma(err);
+  }
+  S.bill.conectando = false;
+  renderBilletera(); renderMias();
+}
+
+function renderBilletera() {
+  const b = S.bill;
+  if (b.sesion) {
+    setChildren($('#billetera'), h('div', { class: 'tarjeta tarjeta--suave pila--chica' },
+      h('div', { class: 'fila fila--separada' },
+        h('div', { class: 'fila' }, icono('wallet'), h('strong', {}, 'Billetera conectada'), h('span', { class: 'mono apagado' }, abreviar(b.direccion))),
+        h('button', { class: 'btn btn-fantasma btn-chico', type: 'button', onclick: () => { desconectarBilletera(); renderBilletera(); renderMias(); } }, 'Desconectar')),
+      h('p', { class: 'apagado', role: 'status' }, b.reservas.length === 0
+        ? 'No encontramos reservas pagadas con esta billetera.'
+        : `Encontramos ${b.reservas.length} ${b.reservas.length === 1 ? 'reserva pagada' : 'reservas pagadas'} con esta billetera. Las ves abajo, en cualquier dispositivo.`)));
+    return;
+  }
+  if (!window.ethereum) {
+    setChildren($('#billetera'), h('div', { class: 'tarjeta tarjeta--suave pila--chica' },
+      h('div', { class: 'fila' }, icono('wallet'), h('strong', {}, '¿Pagaste con tu billetera?')),
+      h('p', { class: 'apagado' }, 'Abrí esta página desde el navegador de tu billetera (MetaMask, MiniPay…) y vas a ver tus reservas desde cualquier celular o computadora.')));
+    return;
+  }
+  setChildren($('#billetera'), h('div', { class: 'tarjeta pila--chica' },
+    h('div', { class: 'fila' }, icono('wallet'), h('h3', {}, 'Ver mis reservas con mi billetera')),
+    h('p', { class: 'apagado' }, 'Firmás un mensaje (no cuesta nada ni mueve plata) y te mostramos todas las reservas que pagaste con esa billetera, desde cualquier dispositivo.'),
+    b.mensaje,
+    h('button', { class: 'btn btn-secundario btn-bloque', type: 'button', id: 'conectar-billetera', onclick: conectarBilletera, ...(b.conectando ? { 'aria-busy': 'true' } : {}) }, b.conectando ? 'Esperando tu firma…' : 'Conectar billetera')));
 }
 
 init().catch((err) => {

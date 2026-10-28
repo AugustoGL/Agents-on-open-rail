@@ -41,6 +41,7 @@ Pensada primero para el celular (390 px), con modo claro y oscuro automático, b
 
 - **Web de reservas (`/`)**: tira de días, turnos agrupados por hora con las canchas, formulario corto y pago. El token (wARS) va en letra chica: "$ 6.000 *en wARS*".
 - **Pago (`/pagar/:id`)**: resumen, cuenta regresiva, conectar billetera y pagar, ayuda para quien no tiene wARS y todos los estados (sin billetera, red equivocada, sin saldo, firma rechazada, vencida, ya pagada). En **MODO PRUEBA** hay un botón "Pagar de prueba" que recorre el pago completo sin billetera (usa el mismo camino x402; no existe con la cadena real).
+- **Mis reservas con la billetera**: en "Mis reservas", "Ver mis reservas con mi billetera" pide firmar un mensaje de un solo uso (no cuesta gas ni mueve plata). Con esa firma se muestran todas las reservas pagadas desde esa dirección, en cualquier dispositivo, y se pueden cancelar (la seña vuelve a la misma billetera). También lo puede usar un agente de IA que pagó por x402. Solo billeteras comunes (EOA, como MetaMask y MiniPay); las reservas sin pagar todavía no tienen billetera y siguen en el navegador.
 - **Registro público (`/decisiones`)**: lo que decide el agente, en castellano, con la regla aplicada y la transacción; con números del agente y sin datos personales.
 - **Panel (`/panel`)**: menú inferior en el celular y barra lateral en pantallas grandes.
 
@@ -87,7 +88,7 @@ Requisitos: Node 22.5 o más nuevo.
 
 ```bash
 npm install
-npm test          # 115 pruebas: política, agente, configuración y bloqueos, panel, web, diseño (contraste AA), HTTP con x402 real (facilitador simulado), bot, cadena
+npm test          # 123 pruebas: política, agente, configuración y bloqueos, panel, web, diseño (contraste AA), HTTP con x402 real (facilitador simulado), bot, cadena
 npm run e2e       # prueba en un navegador real (Chrome): reserva web, pago de prueba, cancelación y panel. Sin plata
 npm run seed      # (solo MODE=mock) carga reservas ficticias en todos los estados y decisiones variadas: `npm run seed -- --reset` para rehacerlas
 npm run capturas  # capturas de cada pantalla en celular y escritorio -> docs/capturas/

@@ -18,7 +18,8 @@ import { BusinessSettings } from '../src/settings.js';
 import { loadBusiness } from '../src/config.js';
 import { localDateStr, addDays } from '../src/time.js';
 import { sembrar } from './seed-lib.mjs';
-import { launchChrome } from './lib-cdp.mjs';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
+import { launchChrome, instalarBilleteraFirmante } from './lib-cdp.mjs';
 
 const OUT = process.env.OUT ?? fileURLToPath(new URL('../docs/capturas/', import.meta.url));
 const CLAVE = 'clave-de-prueba-123';
@@ -49,7 +50,9 @@ const hoy = localDateStr(Date.now(), prueba.agent.offset);
 const token = `api:${hex(16)}`;
 const yo = { id: token, name: 'Marta', channel: 'web' };
 const hacer = (off, hora, recurso = 'Cancha 1', hold) => prueba.agent.reserve({ resource: recurso, startAt: prueba.agent.listSlots({ dateStr: addDays(hoy, off) }).find((s) => s.time === hora && s.resource === recurso).startAt, customer: yo, holdMinutes: hold }).booking;
-const pagarFalso = async (b) => { prueba.chain.credit(b.deposit_wei); await prueba.agent.onPaymentSettled({ bookingId: b.id, payer: `0x${hex(20)}`, tx: `0x${hex(32)}`, amountWei: b.deposit_wei }); };
+const pagarFalso = async (b, payer = `0x${hex(20)}`) => { prueba.chain.credit(b.deposit_wei); await prueba.agent.onPaymentSettled({ bookingId: b.id, payer, tx: `0x${hex(32)}`, amountWei: b.deposit_wei }); };
+// Una billetera de prueba que firma de verdad, con reservas pagadas desde ella (para "Ver mis reservas con mi billetera").
+const firmante = privateKeyToAccount(generatePrivateKey());
 const confirmada = hacer(3, '20:00', 'Cancha 2'); await pagarFalso(confirmada);
 const sinPagar = hacer(3, '21:30', 'Cancha 1');
 const pasada = hacer(3, '12:00', 'Cancha 1'); await pagarFalso(pasada); await prueba.agent.cancel({ bookingId: pasada.id, customerId: token });
@@ -62,6 +65,7 @@ const pendienteNueva = () => {
   return prueba.agent.reserve({ resource: libre.resource, startAt: libre.startAt, customer: { id: `api:${hex(16)}`, name: 'Marta', channel: 'web' } }).booking;
 };
 let aPagar;
+const pagadasConBilletera = [];
 prueba.agent.joinWaitlist({ resource: 'Cancha 2', startAt: prueba.agent.listSlots({ dateStr: addDays(hoy, 1) }).find((s) => s.time === '20:00' && s.resource === 'Cancha 2').startAt, customer: yo });
 const idEnEspera = sinPagar.id;
 
@@ -136,6 +140,9 @@ const clicTexto = (page, texto) => page.evaluate(`(() => { const b = [...documen
 const valor = (page, sel, v) => page.evaluate(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
 const hayTurnos = 'document.querySelectorAll(".turno").length > 0';
 
+for (let i = 0; i < 3; i++) { const b = pendienteNueva(); await pagarFalso(b, firmante.address); pagadasConBilletera.push(b); }
+await prueba.agent.cancel({ bookingId: pagadasConBilletera[2].id, by: 'wallet' }); // una ya cancelada, con su devolución
+
 for (const v of VISTAS) {
   const P = prueba;
   aPagar = pendienteNueva();
@@ -157,6 +164,22 @@ for (const v of VISTAS) {
     await pg.goto(`${P.base}/`); await pg.waitFor('document.querySelector("#mis .tarjeta")', 'mis reservas');
     await pg.evaluate('[...document.querySelectorAll("#mis button")].find((b) => b.textContent.trim() === "Cancelar").click()'); await pg.sleep(700);
     await pg.evaluate('document.querySelector("#mis-reservas").scrollIntoView()');
+  } });
+  const conFirmante = async (pg) => { await instalarBilleteraFirmante(pg, firmante); };
+  const irAMias = async (pg) => { await pg.goto(`${P.base}/`); await pg.waitFor('document.querySelector("#billetera .tarjeta")', 'tarjeta de billetera'); };
+  await pantalla(v, '05b-mis-reservas-conectar-billetera', P, { preparar: conFirmante, antes: async (pg) => { await irAMias(pg); await pg.evaluate('document.querySelector("#mis-reservas").scrollIntoView()'); } });
+  await pantalla(v, '05c-mis-reservas-con-billetera', P, { preparar: conFirmante, antes: async (pg) => {
+    await irAMias(pg); await pg.evaluate('document.querySelector("#conectar-billetera").click()');
+    await pg.waitFor(`document.body.innerText.includes('Billetera conectada')`, 'billetera conectada');
+    await pg.waitFor(`document.querySelectorAll('#mis .tarjeta').length >= 3`, 'reservas de la billetera'); await pg.evaluate('document.querySelector("#mis-reservas").scrollIntoView()');
+  } });
+  await pantalla(v, '05d-billetera-cancelar-vista-previa', P, { preparar: conFirmante, antes: async (pg) => {
+    await irAMias(pg); await pg.evaluate('document.querySelector("#conectar-billetera").click()');
+    await pg.waitFor(`document.body.innerText.includes('Billetera conectada')`, 'billetera conectada');
+    const cancelarDeConfirmada = `[...document.querySelectorAll('#mis .tarjeta')].filter((c) => /Confirmada/.test(c.textContent)).map((c) => [...c.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Cancelar')).find(Boolean)`;
+    await pg.waitFor(cancelarDeConfirmada, 'botón cancelar de una reserva confirmada');
+    await pg.evaluate(`(${cancelarDeConfirmada}).click()`);
+    await pg.waitFor(`document.body.innerText.includes('Si cancelás ahora')`, 'vista previa'); await pg.evaluate('document.querySelector("#mis-reservas").scrollIntoView()');
   } });
   await pantalla(v, '07-pago-sin-billetera', P, { antes: ir(`/pagar/${aPagar.id}`), esperar: 'document.querySelector(".cuenta")' });
   await pantalla(v, '08-pago-billetera-red-equivocada', P, { preparar: async (pg) => { await pg.cmd('Page.addScriptToEvaluateOnNewDocument', { source: billetera({ red: '0x1' }) }); await simularRpc(pg, 0n); },

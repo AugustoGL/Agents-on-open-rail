@@ -303,7 +303,8 @@ export class SenaAgent {
   }
 
   /**
-   * Cancela una reserva. Con by = 'owner' cancela el comercio; con fullRefund devuelve toda la seña
+   * Cancela una reserva. Con by = 'owner' cancela el comercio; con by = 'wallet' cancela quien pagó (ya probó ser dueño de la
+   * billetera con una firma); con fullRefund devuelve toda la seña
    * sin aplicar la política (por ejemplo cuando se bloquea un turno ya pagado).
    */
   async cancel({ bookingId, customerId, by = 'customer', fullRefund = false, reason = null }) {

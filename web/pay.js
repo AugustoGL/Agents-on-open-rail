@@ -143,7 +143,7 @@ function vistaPagada() {
   return [
     h('div', { class: 'comprobante pila' }, h('h2', {}, '¡Tu turno quedó confirmado!'), resumen(b, { pagada: true }),
       h('dl', { class: 'resumen' }, h('div', {}, h('dt', {}, 'Comprobante'), h('dd', {}, real ? h('a', { href: safeHref(`https://celoscan.io/tx/${tx}`), target: '_blank', rel: 'noopener noreferrer' }, abreviar(tx)) : (tx ? h('span', { class: 'mono' }, `${abreviar(tx)} (simulado)`) : '—'))))),
-    aviso('info', h('strong', {}, 'Si necesitás cancelar'), 'Entrá a "Mis reservas" desde este mismo navegador. Antes de confirmar te mostramos cuánto te devolvemos y por qué.'),
+    aviso('info', h('strong', {}, 'Si necesitás cancelar'), 'Entrá a "Mis reservas": antes de confirmar te mostramos cuánto te devolvemos y por qué. Desde cualquier dispositivo la ves conectando la billetera con la que pagaste.'),
     h('div', { class: 'acciones' }, h('a', { class: 'btn btn-primario', href: '/#mis-reservas' }, 'Ver mis reservas'), h('a', { class: 'btn btn-secundario', href: '/' }, 'Reservar otro turno')),
     politica(),
   ];

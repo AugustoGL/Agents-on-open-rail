@@ -443,4 +443,9 @@ export class Store {
     return this.db.prepare("SELECT amount_wei FROM transfers WHERE kind = 'refund' AND status = 'sent'").all()
       .reduce((acc, r) => acc + BigInt(r.amount_wei), 0n);
   }
+
+  /** Reservas pagadas desde una billetera (las que ya tienen pagador), las más nuevas primero. */
+  bookingsForPayer(address, limit = 50) {
+    return this.db.prepare('SELECT * FROM bookings WHERE payer IS NOT NULL AND LOWER(payer) = LOWER(?) ORDER BY start_at DESC LIMIT ?').all(address, limit);
+  }
 }

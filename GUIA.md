@@ -18,7 +18,7 @@ web/        código de la página de pago (se compila a public/pay.bundle.js, ya
 public/     web de reservas (/), registro público (/decisiones), panel (/panel) y página de pago /pagar/<reserva>
 config/     negocio.json: valores INICIALES del negocio (después se editan desde el panel)
 scripts/    herramientas: saldo, chequeos, registro ERC-8004, verificar tag, comprador de prueba, demo, prueba de navegador (e2e)
-test/       115 pruebas automáticas
+test/       123 pruebas automáticas
 agent.json  ficha de identidad ERC-8004 (se publica en GitHub)
 ```
 
@@ -56,7 +56,7 @@ Después:
 
 ```bash
 npm install
-npm test        # tiene que terminar con "pass 115" y "fail 0"
+npm test        # tiene que terminar con "pass 123" y "fail 0"
 npm run demo    # cuenta la historia completa con plata simulada
 ```
 

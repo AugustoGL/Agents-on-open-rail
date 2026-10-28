@@ -82,3 +82,34 @@ export async function launchChrome({ chromeBin = process.env.CHROME_BIN ?? 'goog
   }
   return { newPage, close };
 }
+
+/**
+ * Billetera simulada que firma de verdad: la página llama a window.ethereum (como lo haría MetaMask) y la firma la hace
+ * Node con la clave de prueba que se le pase (una cuenta de viem). No sale a la red ni mueve nada.
+ */
+export async function instalarBilleteraFirmante(page, account, { chainId = '0xa4ec' } = {}) {
+  await page.cmd('Runtime.addBinding', { name: '__firmaNode' });
+  page.on(async (msg) => {
+    if (msg.method !== 'Runtime.bindingCalled' || msg.params.name !== '__firmaNode') return;
+    const { id, message } = JSON.parse(msg.params.payload);
+    const firma = await account.signMessage({ message });
+    await page.evaluate(`window.__firmaListo(${id}, ${JSON.stringify(firma)})`);
+  });
+  await page.cmd('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const esperando = new Map(); let n = 0;
+    window.__firmaListo = (id, firma) => { esperando.get(id)?.(firma); esperando.delete(id); };
+    window.ethereum = {
+      isMetaMask: true,
+      request: async ({ method, params }) => {
+        if (method === 'eth_requestAccounts' || method === 'eth_accounts') return [${JSON.stringify(account.address.toLowerCase())}];
+        if (method === 'eth_chainId') return '${chainId}';
+        if (method === 'personal_sign') {
+          const bytes = Uint8Array.from(params[0].slice(2).match(/../g).map((b) => parseInt(b, 16)));
+          return new Promise((resolve) => { const id = ++n; esperando.set(id, resolve); window.__firmaNode(JSON.stringify({ id, message: new TextDecoder().decode(bytes) })); });
+        }
+        throw new Error('Método no simulado: ' + method);
+      },
+      on() {}, removeListener() {},
+    };
+  })();` });
+}
