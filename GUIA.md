@@ -13,12 +13,12 @@ Todo en Linux, desde la terminal. Andá en orden: hasta el paso 6 **no se mueve 
 ## 0. Qué hay en el zip
 
 ```
-src/        el agente (reglas, cobros x402, cadena, agenda/Google Calendar, bot de Telegram, API)
+src/        el agente (reglas, cobros x402, cadena, configuración, panel, bot de Telegram, API)
 web/        código de la página de pago (se compila a public/pay.bundle.js, ya viene compilada)
-public/     página /pagar/<reserva> que abre el cliente
-config/     negocio.json: canchas, horarios, precio, política de cancelación
-scripts/    herramientas: saldo, chequeos, registro ERC-8004, verificar tag, comprador de prueba, demo
-test/       70 pruebas automáticas
+public/     web de reservas (/), registro público (/decisiones), panel (/panel) y página de pago /pagar/<reserva>
+config/     negocio.json: valores INICIALES del negocio (después se editan desde el panel)
+scripts/    herramientas: saldo, chequeos, registro ERC-8004, verificar tag, comprador de prueba, demo, prueba de navegador (e2e)
+test/       115 pruebas automáticas
 agent.json  ficha de identidad ERC-8004 (se publica en GitHub)
 ```
 
@@ -56,7 +56,7 @@ Después:
 
 ```bash
 npm install
-npm test        # tiene que terminar con "pass 70" y "fail 0"
+npm test        # tiene que terminar con "pass 115" y "fail 0"
 npm run demo    # cuenta la historia completa con plata simulada
 ```
 
@@ -184,7 +184,7 @@ sudo dpkg -i cloudflared.deb
 cloudflared tunnel --url http://localhost:8402
 ```
 
-Te da algo como `https://palabras-raras.trycloudflare.com`. Ponelo en `.env` como `PUBLIC_BASE_URL` y reiniciá `npm start`. Ojo: **cambia cada vez** que reiniciás el túnel. Para la entrega final conviene un servidor fijo (lo vemos).
+Te da algo como `https://palabras-raras.trycloudflare.com`. Ponelo en `.env` como `PUBLIC_BASE_URL`, agregá `TRUST_PROXY=true` y reiniciá `npm start`. Ojo: **cambia cada vez** que reiniciás el túnel. Para la entrega final conviene un servidor fijo (lo vemos).
 
 ## 10. Cobros reales (MODE=live)
 
@@ -199,39 +199,36 @@ Guardate todos los hashes: son la prueba para la entrega.
 
 Si un pago falla con un error del facilitador sobre extensiones, probá `X402_BUILDER_CODE=false` en `.env`.
 
-## 11. Cambiar el negocio
+## 11. Panel del comercio y configuración del negocio
 
-Todo está en `config/negocio.json`: nombre, canchas, horarios, precio (`precioTurnoArs`), porcentaje de seña, horas de la política de cancelación, topes de devoluciones automáticas. Reiniciá después de cambiarlo. Para no gastar mucho en pruebas podés bajar el precio (ej. `precioTurnoArs: 400` → seña de $100).
+1. En `.env` poné una clave para el panel (mínimo 8 caracteres) y reiniciá:
 
-## 12. Conectar el Google Calendar del comercio (opcional)
+   ```
+   OWNER_DASHBOARD_PASSWORD=una-clave-larga-que-solo-sepas-vos
+   ```
 
-Seña es la puerta de pago: el comercio sigue usando su calendario y Seña lo lee (qué está libre) y lo escribe (cada turno pagado). Sin esto, Seña usa su grilla propia y todo funciona igual que hasta acá.
+   Sin esa variable el panel queda **deshabilitado** (la página `/panel` lo dice). Si lo publicás por un túnel o proxy, poné también `TRUST_PROXY=true` para que el límite de intentos cuente la IP real de cada persona.
+2. Abrí `http://localhost:8402/panel` (o tu dirección https) e ingresá con la clave. Tras 5 intentos fallidos desde una misma IP se bloquea el ingreso por 15 minutos.
+3. Secciones: **Hoy**, **Calendario** (día y semana), **Reservas** (cancelar con vista previa), **Pendientes** (aprobar o rechazar), **Bloqueos**, **Decisiones del agente**, **Configuración** y **Cierre del día**. En el celular las cuatro primeras están en el menú inferior y el resto en "Más"; en pantallas grandes hay una barra lateral.
 
-**Una sola vez, en Google:**
+**La configuración vive en la base de datos.** `config/negocio.json` se importa **una sola vez**, cuando la base está vacía; cambiarlo después no tiene efecto. Todo se edita en **Configuración**: nombre y descripción, canchas (agregar, renombrar y desactivar; no se borran), horarios base, por día de la semana y por cancha (dejá vacío para usar los base, o marcá "Cerrado"), duración, anticipación, precio, % de seña, minutos para pagar, política de cancelación, topes del agente y hora del cierre. Cada valor se valida al guardar y el panel marca el campo con el problema. Para no gastar mucho en pruebas podés bajar el precio (ej. 400 → seña de $100).
 
-1. Entrá a **console.cloud.google.com** y creá un proyecto (por ejemplo "Seña").
-2. **APIs y servicios → Biblioteca →** buscá **Google Calendar API → Habilitar**.
-3. **IAM y administración → Cuentas de servicio → Crear cuenta de servicio** (nombre: "sena"; no hace falta darle roles). Copiá el **email** de la cuenta (termina en `.iam.gserviceaccount.com`).
-4. En esa cuenta: **Claves → Agregar clave → Crear clave nueva → JSON**. Se baja un archivo. **Es secreto**: guardalo en `secrets/` dentro del repo (esa carpeta ya está en `.gitignore`), por ejemplo `secrets/google-sena.json`. No lo pegues en ningún chat.
-5. Abrí **Google Calendar** con la cuenta del comercio. En el calendario de las canchas: **Configuración y uso compartido → Compartir con personas específicas → Agregar personas** y pegá el email del paso 3 con el permiso **"Hacer cambios en los eventos"**.
-6. En esa misma pantalla, bajá hasta **Integrar el calendario** y copiá el **ID del calendario** (algo como `abc123@group.calendar.google.com`, o el mail si es el calendario principal).
+- **Los cambios valen para reservas nuevas.** Las reservas ya hechas conservan la seña y la política con las que se pagaron.
+- Cada cambio queda en el **Historial de cambios** (quién, cuándo, antes y después) y en Decisiones.
+- **Solo se cambian en `.env`** (por seguridad): la dirección de retiro, las claves, `PAY_TO` y el modo.
 
-**En el `.env`:**
+**Bloqueos** (feriados, mantenimiento, un turno puntual): en la sección Bloqueos elegí un día entero, una cancha (uno o varios días) o un turno, con un motivo (**lo ven los clientes**). Si ya hay reservas pagadas adentro, el panel te avisa y te ofrece "Cancelar esas reservas y devolver todo": pasa por el agente (con sus topes: si supera el tope automático queda en Pendientes para que la apruebes) y queda en Decisiones. También podés bloquear un turno tocándolo en el Calendario.
 
-```
-GOOGLE_SERVICE_ACCOUNT_JSON_PATH=secrets/google-sena.json
-GOOGLE_CALENDAR_ID=abc123@group.calendar.google.com
-```
+## 12. Datos de demostración y capturas
 
-Reiniciá `npm start`. Tiene que decir `Agenda: Google Calendar (...)` y después `Agenda: acceso al calendario verificado.` Si dice que no puede leerlo, casi siempre es el paso 5 (calendario sin compartir) o que la API del paso 2 no está habilitada. Si falta alguna de las dos variables, Seña usa la grilla propia.
+- `npm run seed` carga reservas ficticias en todos los estados (esperando pago, confirmada, cancelada, vencida, jugada), cancelaciones de cada tipo, reventa, lista de espera, bloqueos, un pendiente de aprobación y decisiones variadas. **Solo funciona con MODE=mock** y se niega a tocar `data/sena.db` (la base real). Es en la base de prueba `data/sena-demo.db`; si ya tiene reservas, usá `npm run seed -- --reset` (borra esa base de prueba y la rehace).
+- `npm run capturas` abre Chrome y guarda una captura de cada pantalla (celular 390x844 y escritorio 1280x800, claro y oscuro) en `docs/capturas/`, incluidos los estados de la página de pago con una billetera simulada. Avisa si detecta desbordes o errores de consola. Con `OUT=/carpeta` las guarda en otro lado.
+- La guía de estilos está en `/guia-estilos`.
 
-**Cómo se interpreta el calendario:**
+## 13. Probar la web y el panel en el navegador
 
-- **Un solo calendario para todas las canchas.** Cada evento tiene que **nombrar la cancha en el título o en el lugar**: `Cancha 1 - Pérez`. Un evento que no nombra ninguna cancha (`Torneo`, `Feriado`) ocupa **todas**.
-- Los eventos "de día completo" ocupan todo el día. Los marcados como "Disponible" (transparentes) y los cancelados no cuentan.
-- Los horarios que ofrece Seña siguen saliendo de `config/negocio.json` (grilla, duración, anticipación); el calendario solo dice qué está ocupado.
-- Los turnos pagados aparecen como `Cancha 1 · Nombre (seña pagada)`. **No los muevas ni los borres a mano**: si cancelás desde el calendario, la seña no se devuelve (cancelá desde Telegram o la API).
-- Si Google falla, Seña no confirma ni cobra, y te avisa. Si falla al cancelar, devuelve la seña igual y reintenta borrar el evento sola cada 10 minutos.
+- A mano, en modo prueba: `npm start` (con `OWNER_DASHBOARD_PASSWORD` en `.env`), abrí `/`, reservá un turno y mirá la página de pago (dice **MODO PRUEBA**). Para ver todo el flujo sin plata, `npm run demo`.
+- Automática: `npm run e2e` abre Chrome (o el navegador que indiques con `CHROME_BIN=/ruta/al/navegador`) en una base temporal y simulada, y recorre la reserva web (reservar → pagar → mis reservas → cancelar → lista de espera) y el panel (ingreso, calendario, configuración, bloqueos, cierre). No usa tu `.env` ni mueve plata. Con `SHOTS=/carpeta npm run e2e` guarda capturas.
 
 ## Problemas comunes
 
@@ -245,7 +242,8 @@ Reiniciá `npm start`. Tiene que decir `Agenda: Google Calendar (...)` y despué
 | El link de pago sale como texto | Falta https (paso 9) |
 | "No te alcanza el saldo de wARS" | La wallet que paga necesita wARS (Ripio) |
 | Una devolución quedó "pendiente" | Superó un tope: `/pendientes` y `/aprobar <n>` |
-| "No puedo ver el calendario del comercio" | Falló Google Calendar: sección 12 (¿compartiste el calendario con la cuenta de servicio?). Mientras tanto no se confirma ni se cobra nada |
+| "El panel está deshabilitado" | Falta `OWNER_DASHBOARD_PASSWORD` en `.env` (sección 11) |
+| "Demasiados intentos" en el panel | Esperá 15 minutos; son 5 fallos por IP |
 | Una transferencia quedó "dudosa" | No se reintenta sola a propósito: mirá el hash en Celoscan antes de aprobar |
 
 ## Para preguntar en office hours
