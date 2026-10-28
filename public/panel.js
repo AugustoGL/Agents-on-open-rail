@@ -231,7 +231,12 @@ async function abrirReserva(id, alCambiar) {
     h('dl', { class: 'resumen' },
       fila('Turno', `${b.recurso} · ${b.inicioLocal}`), fila('Cliente', b.cliente ?? '—'), fila('Contacto', b.contacto ?? '—'), fila('Canal', b.canal), fila('Seña', money(b.sena.texto)),
       b.devuelto.wei !== '0' ? fila('Devuelto', money(b.devuelto.texto)) : null, b.pagador ? fila('Pagó desde', abreviar(b.pagador)) : null, b.pagoTx ? fila('Comprobante', txLink(b.pagoTx)) : null,
-      b.venceEl ? fila('Vence', fmtInstant(b.venceEl)) : null, b.reglaCancelacion ? fila('Regla de cancelación', b.reglaCancelacion) : null),
+      b.venceEl ? fila('Vence', fmtInstant(b.venceEl)) : null, b.reglaCancelacion ? fila('Regla de cancelación', b.reglaCancelacion) : null,
+      b.nft ? fila('Ticket NFT', h('span', {}, b.nft.estado === 'error' ? 'No salió todavía' : b.nft.estado === 'enviando' ? 'Enviándose…' : b.nft.estado === 'jugado' ? 'Jugado' : 'Enviado', b.nft.simulado ? ' (simulado)' : '', ' · ', abreviar(b.nft.billetera), b.nft.simulado ? null : [' · ', h('a', { href: safeHref(b.nft.urlToken), target: '_blank', rel: 'noopener noreferrer' }, 'Ver')])) : null,
+      b.nft?.estado === 'error' ? fila('Error del ticket', b.nft.error ?? '—') : null),
+    sessionInfo.nft && (b.nft?.estado === 'error' || (b.estado === 'confirmed' && !b.nft)) ? h('div', { class: 'pila--chica' }, h('button', { class: 'btn btn-secundario', type: 'button', onclick: async () => {
+      try { await api('POST', `/reservas/${b.id}/nft/reintentar`, {}); v.cerrar(); if (alCambiar) await alCambiar(); } catch (err) { setChildren(mensaje, errorAviso(err)); }
+    } }, 'Reintentar el ticket NFT')) : null,
     activa ? h('div', { class: 'pila' }, h('h3', {}, 'Cancelar esta reserva'), h('div', { class: 'campo' }, h('label', {}, 'Motivo (se le avisa al cliente)'), motivo),
       opcion('Según la política', d.cancelarSegunPolitica, b.estado === 'held' ? 'Cancelar (todavía no pagó)' : 'Cancelar según la política', 'politica', false),
       b.estado === 'confirmed' ? opcion('Cancela el comercio: devuelve todo', d.cancelarDevolviendoTodo, 'Cancelar y devolver toda la seña', 'total', true) : null, mensaje) : null,

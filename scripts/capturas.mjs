@@ -18,6 +18,7 @@ import { BusinessSettings } from '../src/settings.js';
 import { loadBusiness } from '../src/config.js';
 import { localDateStr, addDays } from '../src/time.js';
 import { sembrar } from './seed-lib.mjs';
+import { createSimulatedNft, tokenIdFor } from '../src/nft.js';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { launchChrome, instalarBilleteraFirmante } from './lib-cdp.mjs';
 
@@ -33,14 +34,15 @@ const business = new BusinessSettings(store).loadOrSeed(() => loadBusiness());
 async function levantar(modo) {
   const chain = createMockChain({ logger: quiet });
   if (modo === 'real') chain.mode = 'live';
-  const agent = new SenaAgent({ store, business, chain, logger: quiet, payoutAddress: '0x000000000000000000000000000000000000dEaD' });
+  const nft = modo === 'prueba' ? createSimulatedNft() : null; // el ticket NFT, simulado en memoria
+  const agent = new SenaAgent({ store, business, chain, logger: quiet, payoutAddress: '0x000000000000000000000000000000000000dEaD', nft });
   const facilitator = new MockFacilitator({ chain, logger: quiet });
   const payments = createPaymentServer({ agent, facilitator, payTo: chain.address, builderCode: null, logger: quiet });
   const app = createApp({ agent, payments, logger: quiet, dashboardPassword: CLAVE, createLimit: { windowMs: 60_000, max: 10_000 }, panelOptions: { maxFailuresPerIp: 1000 } });
   const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const base = `http://127.0.0.1:${server.address().port}`;
   agent.publicBaseUrl = base;
-  return { agent, chain, server, base };
+  return { agent, chain, server, base, nft };
 }
 const prueba = await levantar('prueba');
 const real = await levantar('real');
@@ -66,6 +68,12 @@ const pendienteNueva = () => {
 };
 let aPagar;
 const pagadasConBilletera = [];
+// Un ticket que todavía no salió (la cadena tardó) y otro que falló varias veces, para ver esos estados.
+const nftEnviando = pendienteNueva(); const nftError = pendienteNueva();
+prueba.nft.bloqueados.add(String(tokenIdFor(nftEnviando.id))); prueba.nft.bloqueados.add(String(tokenIdFor(nftError.id)));
+await pagarFalso(nftEnviando); await pagarFalso(nftError);
+for (let i = 0; i < 6; i++) await prueba.agent.processNft(); // los dos agotan los intentos...
+prueba.agent.store.updateBooking(nftEnviando.id, { nft_attempts: 1, nft_error: null }, Date.now()); // ...y uno vuelve a "enviando"
 prueba.agent.joinWaitlist({ resource: 'Cancha 2', startAt: prueba.agent.listSlots({ dateStr: addDays(hoy, 1) }).find((s) => s.time === '20:00' && s.resource === 'Cancha 2').startAt, customer: yo });
 const idEnEspera = sinPagar.id;
 
@@ -189,6 +197,8 @@ for (const v of VISTAS) {
   await pantalla(v, '09b-pago-firma-rechazada', P, { preparar: async (pg) => { await pg.cmd('Page.addScriptToEvaluateOnNewDocument', { source: billetera({}) }); await simularRpc(pg, 50_000n * 10n ** 18n); },
     antes: async (pg, srv) => { await pg.goto(`${srv.base}/pagar/${aPagar.id}`); await pg.waitFor('document.querySelector(".cuenta")', 'pago'); await clicTexto(pg, 'Conectar mi billetera'); await pg.waitFor(`document.body.innerText.includes('Pagar $')`, 'botón pagar'); await clicTexto(pg, 'Pagar $'); await pg.waitFor(`document.body.innerText.includes('No aceptaste en tu billetera')`, 'firma rechazada'); } });
   await pantalla(v, '10-pago-confirmado', P, { antes: ir(`/pagar/${confirmada.id}`), esperar: `document.body.innerText.includes('quedó confirmado')` });
+  await pantalla(v, '10d-pago-ticket-enviando', P, { antes: async (pg, srv) => { prueba.agent.store.updateBooking(nftEnviando.id, { nft_attempts: 1, nft_error: null }, Date.now()); await pg.goto(`${srv.base}/pagar/${nftEnviando.id}`); }, esperar: `document.body.innerText.includes('Estamos mandando el ticket')` });
+  await pantalla(v, '10e-pago-ticket-con-error', P, { antes: ir(`/pagar/${nftError.id}`), esperar: `document.body.innerText.includes('todavía no salió')` });
   await pantalla(v, '10b-pago-vencida', P, { antes: ir(`/pagar/${vencida.id}`), esperar: `document.body.innerText.includes('Se venció')` });
   await pantalla(v, '10c-pago-no-existe', P, { antes: ir('/pagar/S-ZZZZZZ'), esperar: `document.body.innerText.includes('No encontramos')` });
   await pantalla(v, '11-pago-en-proceso', P, { preparar: async (pg) => { await pg.cmd('Page.addScriptToEvaluateOnNewDocument', { source: billetera({}) }); await simularRpc(pg, 50_000n * 10n ** 18n); await pg.cmd('Page.addScriptToEvaluateOnNewDocument', { source: `window.__lento = true;` }); },

@@ -126,7 +126,7 @@ export function createPanelRouter({
     const s = enabled ? sessionOf(req) : null;
     res.json({
       habilitado: enabled, autenticado: Boolean(s), csrf: s?.csrf ?? null,
-      negocio: agent.business.nombre, modo: agent.chain.mode, esDemostracion: Boolean(agent.business.esDemostracion),
+      negocio: agent.business.nombre, modo: agent.chain.mode, nft: Boolean(agent.nft), esDemostracion: Boolean(agent.business.esDemostracion),
       mensaje: enabled ? null : 'El panel está deshabilitado: falta OWNER_DASHBOARD_PASSWORD en el archivo .env.',
     });
   });
@@ -218,6 +218,11 @@ export function createPanelRouter({
     const r = await agent.cancel({ bookingId: req.params.id, by: 'owner', fullRefund: total, reason: motivo || null });
     if (!r.ok) return res.status(409).json({ error: r.reason });
     return res.json({ ok: true, regla: r.rule, motivo: r.reason, devolucion: formatArs(r.refundWei) });
+  }));
+
+  router.post('/api/reservas/:id/nft/reintentar', wrap(async (req, res) => {
+    const r = await agent.retryNft(req.params.id);
+    return r.ok ? res.json({ ok: true, nft: r.nft }) : res.status(409).json({ error: r.reason });
   }));
 
   // --- Decisiones --------------------------------------------------------------------

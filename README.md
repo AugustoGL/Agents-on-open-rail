@@ -42,6 +42,7 @@ Pensada primero para el celular (390 px), con modo claro y oscuro automático, b
 - **Web de reservas (`/`)**: tira de días, turnos agrupados por hora con las canchas, formulario corto y pago. El token (wARS) va en letra chica: "$ 6.000 *en wARS*".
 - **Pago (`/pagar/:id`)**: resumen, cuenta regresiva, conectar billetera y pagar, ayuda para quien no tiene wARS y todos los estados (sin billetera, red equivocada, sin saldo, firma rechazada, vencida, ya pagada). En **MODO PRUEBA** hay un botón "Pagar de prueba" que recorre el pago completo sin billetera (usa el mismo camino x402; no existe con la cadena real).
 - **Mis reservas con la billetera**: en "Mis reservas", "Ver mis reservas con mi billetera" pide firmar un mensaje de un solo uso (no cuesta gas ni mueve plata). Con esa firma se muestran todas las reservas pagadas desde esa dirección, en cualquier dispositivo, y se pueden cancelar (la seña vuelve a la misma billetera). También lo puede usar un agente de IA que pagó por x402. Solo billeteras comunes (EOA, como MetaMask y MiniPay); las reservas sin pagar todavía no tienen billetera y siguen en el navegador.
+- **Ticket NFT de la reserva**: al confirmarse el pago, el agente le manda a la billetera que pagó un **NFT intransferible** (ERC-721 + ERC-5192, `contracts/SenaTicket.sol`) con la imagen y los datos del turno guardados en el propio contrato. Cancelar lo quema, jugar el turno lo marca como "jugada". Por defecto en **Celo Sepolia** (testnet). Es opcional y la reserva nunca depende de él: si la cadena falla, el ticket se reintenta solo. Ver la GUIA, sección 14.
 - **Registro público (`/decisiones`)**: lo que decide el agente, en castellano, con la regla aplicada y la transacción; con números del agente y sin datos personales.
 - **Panel (`/panel`)**: menú inferior en el celular y barra lateral en pantallas grandes.
 
@@ -75,6 +76,7 @@ Panel /panel ──────┘   (decisiones)  └─ wallet del agente ─�
 - `src/policy.js` — reglas puras y deterministas (cancelación, reventa, topes, retiro).
 - `src/agent.js` — el agente: reservas, pagos, cancelaciones, lista de espera, bloqueos, cola de transferencias, cierre.
 - `src/settings.js` — configuración del negocio: validación, registro de cambios, horarios por día y cancha.
+- `contracts/SenaTicket.sol` (+ `SenaTicket.json` compilado) y `src/nft.js` — el ticket NFT: contrato, contenido del ticket y clientes (real y simulado).
 - `src/panel.js` — panel del comercio (sesión, CSRF, límite de intentos); las rutas llaman a los métodos del agente, sin lógica de plata propia.
 - `src/server.js` — API HTTP y páginas. `src/x402.js` — cobro x402 + facilitador simulado para pruebas. `src/chain.js` — envíos en Celo con tag.
 - `src/bot.js` — Telegram. `src/nl.js` — interpreta texto libre (reglas + Claude opcional).
@@ -88,10 +90,11 @@ Requisitos: Node 22.5 o más nuevo.
 
 ```bash
 npm install
-npm test          # 123 pruebas: política, agente, configuración y bloqueos, panel, web, diseño (contraste AA), HTTP con x402 real (facilitador simulado), bot, cadena
+npm test          # 139 pruebas: política, agente, configuración y bloqueos, panel, web, diseño (contraste AA), HTTP con x402 real (facilitador simulado), bot, cadena
 npm run e2e       # prueba en un navegador real (Chrome): reserva web, pago de prueba, cancelación y panel. Sin plata
 npm run seed      # (solo MODE=mock) carga reservas ficticias en todos los estados y decisiones variadas: `npm run seed -- --reset` para rehacerlas
 npm run capturas  # capturas de cada pantalla en celular y escritorio -> docs/capturas/
+npm run nft:clave # genera una clave de testnet para el NFT; después npm run nft:deploy y npm run nft:probar (ver GUIA, sección 14)
 npm run demo      # la historia completa en modo simulado, sin plata
 npm start         # servidor + bot (MODE=mock por defecto)
 ```

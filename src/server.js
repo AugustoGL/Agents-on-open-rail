@@ -31,6 +31,7 @@ export function publicBooking(agent, b) {
     devuelto: { pesos: weiToArsString(b.refunded_wei), texto: formatArs(b.refunded_wei) },
     pagarEn: agent.apiPayUrl(b),
     paginaDePago: agent.payUrl(b),
+    nft: agent.nftInfo(b),
   };
 }
 
@@ -85,6 +86,9 @@ export function createApp({
       try {
         const check = agent.checkPayable(req.params.id);
         if (!check.ok) return res.status(check.status).json({ error: check.reason, codigo: check.code });
+        // Si la persona conectó su billetera, el ticket NFT va a ella (el pago de prueba lo firma una billetera descartable).
+        const destino = req.body?.billetera;
+        if (typeof destino === 'string' && isAddress(destino)) agent.store.updateBooking(check.booking.id, { nft_to: getAddress(destino) }, agent.now());
         const payingFetch = createPayingFetch({ signer: privateKeyToAccount(generatePrivateKey()), maxPerPaymentWei: BigInt(check.booking.deposit_wei) });
         const r = await payingFetch(`http://127.0.0.1:${req.socket.localPort}/api/reservas/${req.params.id}/pagar`, { method: 'POST' });
         if (!r.ok) {
@@ -117,6 +121,7 @@ export function createApp({
       sena: formatArs(agent.depositWei()),
       moneda: { token: 'wARS', direccion: WARS.address, decimales: WARS.decimals, red: CELO_NETWORK },
       modoPrueba: agent.chain.mode === 'mock',
+      nft: agent.nft ? { red: agent.nft.redNombre, simulado: agent.nft.simulated } : null,
       hoy: localDateStr(agent.now(), agent.offset),
       listaEsperaMinutos: p.ofertaListaEsperaMinutos,
       diasAdelante: b.diasAdelante,
@@ -176,6 +181,14 @@ export function createApp({
     const b = agent.store.getBooking(req.params.id);
     if (!b) return res.status(404).json({ error: 'No existe esa reserva.' });
     res.json({ reserva: publicBooking(agent, b) });
+  });
+
+  // El ticket de la reserva como se ve en la billetera (nombre, imagen y atributos), para mostrarlo en la página.
+  app.get('/api/reservas/:id/nft', (req, res) => {
+    const b = agent.store.getBooking(req.params.id);
+    const info = b ? agent.nftInfo(b) : null;
+    if (!b || !info) return res.status(404).json({ error: 'Esta reserva no tiene ticket NFT.' });
+    return res.json({ nft: info, metadata: agent.ticketDe(b) });
   });
 
   app.post('/api/reservas/:id/cancelar', async (req, res, next) => {

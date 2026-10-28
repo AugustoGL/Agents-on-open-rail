@@ -18,7 +18,7 @@ web/        código de la página de pago (se compila a public/pay.bundle.js, ya
 public/     web de reservas (/), registro público (/decisiones), panel (/panel) y página de pago /pagar/<reserva>
 config/     negocio.json: valores INICIALES del negocio (después se editan desde el panel)
 scripts/    herramientas: saldo, chequeos, registro ERC-8004, verificar tag, comprador de prueba, demo, prueba de navegador (e2e)
-test/       123 pruebas automáticas
+test/       139 pruebas automáticas
 agent.json  ficha de identidad ERC-8004 (se publica en GitHub)
 ```
 
@@ -56,7 +56,7 @@ Después:
 
 ```bash
 npm install
-npm test        # tiene que terminar con "pass 123" y "fail 0"
+npm test        # tiene que terminar con "pass 139" y "fail 0"
 npm run demo    # cuenta la historia completa con plata simulada
 ```
 
@@ -229,6 +229,26 @@ Si un pago falla con un error del facilitador sobre extensiones, probá `X402_BU
 
 - A mano, en modo prueba: `npm start` (con `OWNER_DASHBOARD_PASSWORD` en `.env`), abrí `/`, reservá un turno y mirá la página de pago (dice **MODO PRUEBA**). Para ver todo el flujo sin plata, `npm run demo`.
 - Automática: `npm run e2e` abre Chrome (o el navegador que indiques con `CHROME_BIN=/ruta/al/navegador`) en una base temporal y simulada, y recorre la reserva web (reservar → pagar → mis reservas → cancelar → lista de espera) y el panel (ingreso, calendario, configuración, bloqueos, cierre). No usa tu `.env` ni mueve plata. Con `SHOTS=/carpeta npm run e2e` guarda capturas.
+
+## 14. Ticket NFT de la reserva (Celo Sepolia, una testnet)
+
+Al pagar la seña, el agente le manda a la billetera que pagó un **NFT intransferible** con la imagen y los datos de la reserva (`contracts/SenaTicket.sol`). No cuesta plata real: se despliega y se usa en una **testnet**. El contrato ya está compilado y probado en una EVM local; **falta desplegarlo con una clave tuya de testnet**.
+
+1. **Una clave de testnet para el NFT** (distinta de la del agente del modo real). `npm run nft:clave` genera una nueva, te muestra la dirección y la línea para el `.env`. Copiá `NFT_PRIVATE_KEY=...` al `.env`.
+2. **Fondos de prueba**: pedíselos a la dirección que te mostró en el faucet de Celo Sepolia (https://faucet.celo.org/celo-sepolia).
+3. **Simular el despliegue**: `npm run nft:deploy`. Muestra la red, quién despliega, el saldo y el gas, y no manda nada.
+4. **Desplegar**: `npm run nft:deploy -- --send`. Te da la dirección del contrato y el link del explorador.
+5. **Activarlo**: en el `.env` poné `NFT_CONTRACT=<la dirección>` (y `NFT_CHAIN=celoSepolia`, que es el valor por defecto) y reiniciá `npm start`. Tiene que decir `Ticket NFT: Celo Sepolia (testnet) · contrato 0x…`.
+6. **Probarlo sin pagar nada**: `npm run nft:probar -- --to 0xTuBilletera` emite un ticket de prueba a tu billetera (y con `--quemar` hace el ciclo completo: jugado y quemado). Lo ves en el explorador, y en MetaMask agregando la red Celo Sepolia.
+
+Cómo se usa en la app:
+- **Pagar con tu billetera:** el ticket va a la billetera con la que pagaste. En la confirmación aparece la imagen del ticket, su estado, "Ver en el explorador" y "Agregar a mi billetera".
+- **MODO PRUEBA con "Pagar de prueba":** si conectás tu billetera antes, el ticket va a ella aunque el pago lo firme una billetera de prueba.
+- **Sin `NFT_CONTRACT`:** el NFT queda apagado. Con `NFT_SIMULADO=true` (solo en `MODE=mock`) se simula en memoria, y la pantalla dice "Simulación": sirve para mostrar el flujo sin cadena.
+- **Si la cadena falla:** la reserva queda confirmada igual y el ticket se reintenta solo (hasta 5 veces). Después aparece en el panel con "Reintentar el ticket NFT".
+- **Otras redes:** `NFT_CHAIN=sepolia` (Ethereum Sepolia) o `celo` (mainnet: `nft:deploy` exige `--mainnet` y cuesta plata real).
+
+Para volver a compilar el contrato (solo si lo cambiás): `npm install --no-save solc@0.8.24` y `npm run nft:compile`. La prueba del contrato en una EVM local: `contracts/probar/SenaTicket.ganache.mjs`.
 
 ## Problemas comunes
 

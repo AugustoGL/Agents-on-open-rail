@@ -18,10 +18,11 @@ const publicClient = createPublicClient({ chain: celo, transport: http(RPC) });
 const E = {
   negocio: null, booking: null, vista: 'cargando', fallo: null,
   cuenta: null, saldo: null, redOk: true, conectando: false, pagando: false, aprobando: false, necesitaAprobar: false,
-  mensaje: null, copiado: false, pagoTx: null,
+  mensaje: null, copiado: false, pagoTx: null, nftMeta: null, nftMensaje: null, nftVigilando: 0,
 };
 let walletClient = null;
 let reloj = null;
+let relojNft = null;
 let cuentaEl = null;
 
 const pesos = (wei) => `$ ${(Number(BigInt(wei) / 10n ** 16n) / 100).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -37,6 +38,7 @@ async function cargar() {
     E.booking = r.reserva;
     E.fallo = null;
     E.vista = vistaDe(r.reserva);
+    if (r.reserva.nft && !E.nftMeta) E.nftMeta = (await request('GET', `/api/reservas/${bookingId}/nft`).catch(() => ({}))).metadata ?? null;
   } catch (err) {
     if (err.status === 404) E.vista = 'noexiste';
     else { E.vista = 'red'; E.fallo = errorDeRed(err); }
@@ -123,7 +125,8 @@ function vistaPagar() {
 
   if (prueba) {
     nodes.push(h('div', { class: 'tarjeta pila' }, h('h2', {}, 'Probar sin billetera'),
-      aviso('info', h('strong', {}, 'MODO PRUEBA'), 'Podés recorrer todo el pago sin billetera ni plata: usamos una billetera de prueba y el mismo camino que un pago de verdad.'),
+      aviso('info', h('strong', {}, 'MODO PRUEBA'), 'Podés recorrer todo el pago sin billetera ni plata: usamos una billetera de prueba y el mismo camino que un pago de verdad.',
+        E.negocio?.nft ? (E.cuenta ? ` El ticket NFT va a tu billetera (${abreviar(E.cuenta)}).` : ' Si conectás tu billetera arriba, el ticket NFT llega a ella.') : ''),
       h('button', { class: 'btn btn-secundario btn-bloque', type: 'button', id: 'pago-prueba', onclick: pagoDePrueba, ...(E.pagando ? { 'aria-busy': 'true' } : {}) }, 'Pagar de prueba')));
   }
 
@@ -143,10 +146,65 @@ function vistaPagada() {
   return [
     h('div', { class: 'comprobante pila' }, h('h2', {}, '¡Tu turno quedó confirmado!'), resumen(b, { pagada: true }),
       h('dl', { class: 'resumen' }, h('div', {}, h('dt', {}, 'Comprobante'), h('dd', {}, real ? h('a', { href: safeHref(`https://celoscan.io/tx/${tx}`), target: '_blank', rel: 'noopener noreferrer' }, abreviar(tx)) : (tx ? h('span', { class: 'mono' }, `${abreviar(tx)} (simulado)`) : '—'))))),
+    ...tarjetaNft(),
     aviso('info', h('strong', {}, 'Si necesitás cancelar'), 'Entrá a "Mis reservas": antes de confirmar te mostramos cuánto te devolvemos y por qué. Desde cualquier dispositivo la ves conectando la billetera con la que pagaste.'),
     h('div', { class: 'acciones' }, h('a', { class: 'btn btn-primario', href: '/#mis-reservas' }, 'Ver mis reservas'), h('a', { class: 'btn btn-secundario', href: '/' }, 'Reservar otro turno')),
     politica(),
   ];
+}
+
+// --- Ticket NFT ------------------------------------------------------------------------------------------------------
+
+function tarjetaNft() {
+  const n = E.booking?.nft;
+  if (!n) return [];
+  const nodos = [h('h2', {}, 'Tu reserva, como NFT')];
+  if (E.nftMeta) nodos.push(h('img', { class: 'ticket-imagen', src: E.nftMeta.image, alt: `Ticket de la reserva ${E.booking.id}: ${E.booking.recurso}, ${E.booking.inicioLocal}`, width: '600', height: '340' }));
+  if (n.estado === 'enviando') nodos.push(aviso('info', h('strong', {}, 'Estamos mandando el ticket a tu billetera'), 'Tarda unos segundos. No hace falta que hagas nada: tu reserva ya está confirmada.'));
+  else if (n.estado === 'error') nodos.push(aviso('atencion', h('strong', {}, 'El ticket todavía no salió'), 'Tu reserva está confirmada igual. Seguimos intentando mandarlo a tu billetera.'));
+  else nodos.push(aviso('ok', h('strong', {}, n.estado === 'jugado' ? 'Ticket de un turno ya jugado' : 'Ya está en tu billetera'), `Es un ticket NFT intransferible, de la billetera ${abreviar(n.billetera)}.`));
+  nodos.push(h('dl', { class: 'resumen' },
+    h('div', {}, h('dt', {}, 'Billetera'), h('dd', { class: 'mono' }, abreviar(n.billetera))),
+    h('div', {}, h('dt', {}, 'Red'), h('dd', {}, n.red))));
+  if (n.simulado) nodos.push(aviso('info', h('strong', {}, 'Simulación'), 'En esta demo el ticket no está en ninguna cadena real: así se vería en tu billetera.'));
+  if (E.nftMensaje) nodos.push(E.nftMensaje);
+  const listo = n.estado === 'enviado' || n.estado === 'jugado';
+  if (!n.simulado && listo) {
+    nodos.push(h('div', { class: 'acciones' },
+      h('a', { class: 'btn btn-secundario', href: safeHref(n.urlToken), target: '_blank', rel: 'noopener noreferrer' }, icono('external'), 'Ver en el explorador'),
+      window.ethereum ? h('button', { class: 'btn btn-primario', type: 'button', onclick: agregarNft }, icono('wallet'), 'Agregar a mi billetera') : null));
+  }
+  return [h('section', { class: 'tarjeta pila' }, nodos)];
+}
+
+async function agregarNft() {
+  const n = E.booking.nft;
+  E.nftMensaje = null;
+  try {
+    const chainId = `0x${n.chainId.toString(16)}`;
+    try {
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId }] });
+    } catch (err) {
+      if (err.code !== 4902) throw err;
+      await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId, chainName: n.red, nativeCurrency: n.moneda, rpcUrls: [n.rpcUrl], blockExplorerUrls: [n.explorador] }] });
+    }
+    const ok = await window.ethereum.request({ method: 'wallet_watchAsset', params: { type: 'ERC721', options: { address: n.contrato, tokenId: n.tokenId } } });
+    E.nftMensaje = ok ? aviso('ok', 'Listo: ya lo ves en tu billetera, en la sección de coleccionables.') : aviso('info', 'No se agregó. Podés verlo en el explorador o intentarlo de nuevo.');
+  } catch (err) {
+    E.nftMensaje = mensajeDeBilletera(err, 'No pudimos agregarlo a tu billetera');
+  }
+  render();
+}
+
+/** Mientras el ticket sale, se revisa cada pocos segundos (hasta 2 minutos). */
+async function vigilarNft() {
+  clearInterval(relojNft);
+  if (E.vista !== 'pagada' || E.booking?.nft?.estado !== 'enviando' || E.nftVigilando >= 40) return;
+  relojNft = setInterval(async () => {
+    E.nftVigilando += 1;
+    try { const r = await request('GET', `/api/reservas/${bookingId}`); E.booking = r.reserva; } catch { return; }
+    if (E.booking.nft?.estado !== 'enviando' || E.nftVigilando >= 40) { clearInterval(relojNft); render(); }
+  }, 3000);
 }
 
 const vistaVencida = () => [vacio({ icon: 'hourglass', titulo: 'Se venció el tiempo para pagar', texto: 'El turno se liberó para que lo pueda tomar otra persona. Si todavía lo querés, reservalo de nuevo.', accion: h('a', { class: 'btn btn-primario', href: '/' }, 'Reservar de nuevo') })];
@@ -167,6 +225,7 @@ function render() {
   cuentaEl = null;
   setChildren($('#vista'), vistas[E.vista]());
   if (E.vista === 'pagar') reloj = setInterval(actualizarCuenta, 500);
+  vigilarNft();
 }
 
 function actualizarCuenta() {
@@ -289,7 +348,8 @@ async function pagar() {
 async function pagoDePrueba() {
   E.pagando = true; E.mensaje = null; render();
   try {
-    const r = await request('POST', `/api/modo-prueba/pagar/${bookingId}`, {});
+    // Si hay una billetera conectada, el ticket NFT va a ella (el pago de prueba lo firma una billetera descartable).
+    const r = await request('POST', `/api/modo-prueba/pagar/${bookingId}`, E.cuenta ? { billetera: E.cuenta } : {});
     await terminarPago(r.tx);
     return;
   } catch (err) {

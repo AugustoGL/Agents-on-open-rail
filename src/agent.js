@@ -12,6 +12,7 @@ import {
 import {
   BusinessSettings, deriveBusiness, hoursFor, applyPatch, pickEditable,
 } from './settings.js';
+import { tokenIdFor, ticketMetadata, tokenUri } from './nft.js';
 
 const MINUTE = 60_000;
 const MAX_HOLDS_PER_CUSTOMER = 2;
@@ -33,10 +34,12 @@ export class SenaAgent {
    * @param {string} [deps.payoutAddress] dirección del dueño para el retiro diario
    * @param {BusinessSettings} [deps.settings] guarda los cambios de configuración (por defecto, en la misma base)
    */
-  constructor({ store, business, chain, clock = Date, notifier = nullNotifier, logger = console, publicBaseUrl = 'http://localhost:8402', payoutAddress = null, settings = null }) {
+  constructor({ store, business, chain, clock = Date, notifier = nullNotifier, logger = console, publicBaseUrl = 'http://localhost:8402', payoutAddress = null, settings = null, nft = null }) {
     this.store = store;
     this.business = deriveBusiness(business);
     this.settings = settings ?? new BusinessSettings(store, { now: () => this.now() });
+    this.nft = nft; // cliente del ticket NFT (real o simulado); null = sin NFT
+    this._nftProcessing = null;
     this.chain = chain;
     this.clock = clock;
     this.notifier = notifier;
@@ -270,6 +273,7 @@ export class SenaAgent {
     if (result.kind === 'confirmado') {
       const b = result.booking;
       this.queueResaleRefunds(b);
+      this.queueNftMint(b);
       await this.safeNotify(() => this.notifier.toCustomer(b.customer_id,
         `✅ Listo, tu turno quedó confirmado.\n${this.describe(b)}\nSi necesitás cancelar, usá /cancelar ${b.id}.`, { booking: b }));
       await this.safeNotify(() => this.notifier.toOwner(`💰 Seña cobrada: ${this.describe(b)}\nTx: ${tx}`));
@@ -281,6 +285,7 @@ export class SenaAgent {
       await this.safeNotify(() => this.notifier.toOwner(`↩️ Pago que no correspondía (${result.reason}). Se devuelve ${formatArs(amount)} a ${payer}.`));
     }
     await this.processTransfers();
+    await this.processNft();
     return result;
   }
 
@@ -361,8 +366,10 @@ export class SenaAgent {
     }
     await this.safeNotify(() => this.notifier.toOwner(`❌ Cancelación ${b.id} (${d.rule}): ${d.reason}`));
     await notifyOwnerCancel();
+    this.queueNftBurn(b);
     if (d.offerToWaitlist) await this.offerSlot(b.resource, b.start_at);
     await this.processTransfers();
+    await this.processNft();
     return { ok: true, refundWei: d.refundWei, rule: d.rule, reason: d.reason, transfer };
   }
 
@@ -452,6 +459,7 @@ export class SenaAgent {
     for (const b of done) {
       this.store.updateBooking(b.id, { status: 'completed' }, now);
       this.log({ booking_id: b.id, kind: 'cierre_turno', rule: 'JUGADO', reason: 'El turno terminó. La seña pasa a ser del negocio.' });
+      this.queueNftUsed(b);
     }
     return done.length;
   }
@@ -556,6 +564,120 @@ export class SenaAgent {
     }
     this.log({ booking_id: t.booking_id, kind: 'transferencia', rule: 'RECHAZADA_POR_DUENO', reason: `El dueño rechazó la transferencia #${t.id}.` });
     return { ok: true };
+  }
+
+  // --- Ticket NFT de la reserva ---------------------------------------------------------------------------------
+  // Al confirmarse el pago se le manda a la billetera que pagó un NFT intransferible con los datos de la reserva.
+  // Todo pasa por una cola con reintentos y es idempotente (el id del ticket sale del código de la reserva): si algo
+  // falla, la reserva sigue confirmada y el ticket se reintenta solo. Cancelar quema el ticket; jugar lo marca como jugado.
+
+  static NFT_MAX_INTENTOS = 5;
+
+  /** Los datos del ticket tal como se ven en la billetera. */
+  ticketDe(b, estado = b.status === 'completed' ? 'jugada' : 'confirmada') {
+    return ticketMetadata({
+      negocio: this.business.nombre, recurso: b.resource, cuando: this.fmt(b.start_at), inicioMs: b.start_at,
+      sena: formatArs(b.deposit_wei), codigo: b.id, estado, urlBase: this.publicBaseUrl,
+    });
+  }
+
+  queueNftMint(b) {
+    if (!this.nft) return;
+    const to = b.nft_to ?? b.payer;
+    if (!to) return;
+    this.store.updateBooking(b.id, { nft_to: to, nft_token_id: String(tokenIdFor(b.id)), nft_action: 'mint', nft_attempts: 0, nft_error: null }, this.now());
+  }
+
+  queueNftBurn(b) {
+    if (!this.nft) return;
+    const cur = this.store.getBooking(b.id);
+    if (cur.nft_state === 'minted' || cur.nft_state === 'used') this.store.updateBooking(b.id, { nft_action: 'burn', nft_attempts: 0, nft_error: null }, this.now());
+    else if (cur.nft_action === 'mint') this.store.updateBooking(b.id, { nft_action: null, nft_error: null }, this.now()); // todavía no se había emitido
+  }
+
+  queueNftUsed(b) {
+    if (!this.nft) return;
+    const cur = this.store.getBooking(b.id);
+    if (cur.nft_state === 'minted') this.store.updateBooking(b.id, { nft_action: 'used', nft_attempts: 0, nft_error: null }, this.now());
+    else if (cur.nft_action === 'mint') this.store.updateBooking(b.id, { nft_attempts: 0 }, this.now()); // se emite ya como jugada
+  }
+
+  /** Lo que pasa con el ticket de una reserva, para mostrarlo (o null si no tiene). */
+  nftInfo(b) {
+    if (!this.nft) return null;
+    let estado = null;
+    if (b.nft_state === 'burned') estado = null; // se quemó: ya no hay ticket
+    else if (b.nft_action === 'mint') estado = b.nft_attempts >= SenaAgent.NFT_MAX_INTENTOS ? 'error' : 'enviando';
+    else if (b.nft_state === 'minted' || b.nft_state === 'used') estado = b.nft_action && b.nft_attempts >= SenaAgent.NFT_MAX_INTENTOS ? 'error' : (b.nft_state === 'used' ? 'jugado' : 'enviado');
+    if (!estado) return null;
+    const n = this.nft;
+    return {
+      estado, tokenId: b.nft_token_id, contrato: n.contract, red: n.redNombre, chainId: n.chainId, simulado: n.simulated, billetera: b.nft_to ?? b.payer,
+      urlToken: n.urlToken(b.nft_token_id), urlTx: b.nft_tx && !n.simulated ? n.urlTx(b.nft_tx) : null, error: estado === 'error' ? b.nft_error : null,
+      rpcUrl: n.rpcUrl, explorador: n.explorador, moneda: n.moneda,
+    };
+  }
+
+  /** Hace lo que falte con los tickets: emitir, quemar o marcar como jugados. Nunca tira: los errores quedan anotados y se reintenta. */
+  async processNft() {
+    if (!this.nft) return 0;
+    if (this._nftProcessing) return this._nftProcessing;
+    this._nftProcessing = (async () => {
+      let hechos = 0;
+      for (const row of this.store.nftPending(SenaAgent.NFT_MAX_INTENTOS)) {
+        const tokenId = BigInt(row.nft_token_id ?? tokenIdFor(row.id));
+        const hoy = () => this.now();
+        try {
+          const cur = this.store.getBooking(row.id);
+          if (row.nft_action === 'mint') {
+            if (cur.status !== 'confirmed' && cur.status !== 'completed') { this.store.updateBooking(row.id, { nft_action: null }, hoy()); continue; }
+            if (await this.nft.exists(tokenId)) {
+              this.store.updateBooking(row.id, { nft_state: 'minted', nft_action: cur.status === 'completed' ? 'used' : null, nft_attempts: 0, nft_error: null }, hoy());
+            } else {
+              const { hash } = await this.nft.mint({ to: row.nft_to ?? cur.payer, tokenId, uri: tokenUri(this.ticketDe(cur)) });
+              this.store.updateBooking(row.id, { nft_state: 'minted', nft_action: null, nft_tx: hash, nft_attempts: 0, nft_error: null }, hoy());
+              this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_ENVIADO', reason: `Le mandó la reserva a su billetera como un ticket NFT intransferible (${this.nft.redNombre}).`, tx: hash });
+              await this.safeNotify(() => this.notifier.toCustomer(cur.customer_id, `🎟️ Tu reserva ${cur.id} ya está en tu billetera como NFT.\n${this.nft.urlToken(tokenId)}`));
+            }
+          } else if (row.nft_action === 'burn') {
+            if (await this.nft.exists(tokenId)) {
+              const { hash } = await this.nft.burn(tokenId);
+              this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_QUEMADO', reason: 'Se canceló la reserva, así que se quemó su ticket NFT.', tx: hash });
+            }
+            this.store.updateBooking(row.id, { nft_state: 'burned', nft_action: null, nft_attempts: 0, nft_error: null }, hoy());
+          } else if (row.nft_action === 'used') {
+            if (await this.nft.exists(tokenId)) {
+              const { hash } = await this.nft.setUri(tokenId, tokenUri(this.ticketDe(cur, 'jugada')));
+              this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_USADO', reason: 'El turno se jugó: el ticket NFT pasó a "jugada" y queda como recuerdo.', tx: hash });
+            }
+            this.store.updateBooking(row.id, { nft_state: 'used', nft_action: null, nft_attempts: 0, nft_error: null }, hoy());
+          }
+          hechos++;
+        } catch (err) {
+          const intentos = row.nft_attempts + 1;
+          this.store.updateBooking(row.id, { nft_attempts: intentos, nft_error: String(err.shortMessage ?? err.message).slice(0, 300) }, this.now());
+          this.logger.warn?.(`[nft] ${row.id} ${row.nft_action}: ${err.message}`);
+          if (intentos >= SenaAgent.NFT_MAX_INTENTOS) {
+            this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_FALLO', reason: `No se pudo ${{ mint: 'mandar', burn: 'quemar', used: 'actualizar' }[row.nft_action]} el ticket NFT después de ${intentos} intentos. La reserva no se ve afectada: el dueño puede reintentar desde el panel.` });
+            await this.safeNotify(() => this.notifier.toOwner(`⚠️ El ticket NFT de ${row.id} falló ${intentos} veces (${err.message}). La reserva sigue en pie. Podés reintentar desde el panel.`));
+          }
+        }
+      }
+      return hechos;
+    })();
+    try { return await this._nftProcessing; } finally { this._nftProcessing = null; }
+  }
+
+  /** El dueño reintenta el ticket de una reserva que falló. */
+  async retryNft(bookingId) {
+    if (!this.nft) return { ok: false, reason: 'Esta instalación no usa tickets NFT.' };
+    const b = this.store.getBooking(bookingId);
+    if (!b) return { ok: false, reason: 'No existe esa reserva.' };
+    const action = b.nft_action ?? (b.status === 'confirmed' && !b.nft_state ? 'mint' : null);
+    if (!action) return { ok: false, reason: 'Ese ticket no tiene nada pendiente.' };
+    this.store.updateBooking(b.id, { nft_action: action, nft_token_id: b.nft_token_id ?? String(tokenIdFor(b.id)), nft_to: b.nft_to ?? b.payer, nft_attempts: 0, nft_error: null }, this.now());
+    await this.processNft();
+    return { ok: true, nft: this.nftInfo(this.store.getBooking(b.id)) };
   }
 
   // --- Cierre del día -----------------------------------------------------------
@@ -733,6 +855,7 @@ export class SenaAgent {
       sena: { texto: formatArs(b.deposit_wei), wei: String(b.deposit_wei) }, devuelto: { texto: formatArs(b.refunded_wei), wei: String(b.refunded_wei) },
       pagador: b.payer ?? null, pagoTx: b.pay_tx ?? null, venceEl: b.hold_expires_at ? new Date(b.hold_expires_at).toISOString() : null,
       reglaCancelacion: b.cancel_rule ?? null,
+      nft: this.nftInfo(b),
     };
   }
 

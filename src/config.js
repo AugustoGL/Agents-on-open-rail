@@ -53,12 +53,25 @@ export function loadConfig() {
     anthropicApiKey: env('ANTHROPIC_API_KEY'),
     anthropicModel: env('ANTHROPIC_MODEL', 'claude-haiku-5-5'),
     closeTime: env('CIERRE_HORA', DEFAULT_CLOSE_TIME),
+    // Ticket NFT de la reserva: con NFT_CONTRACT se manda de verdad (por defecto a Celo Sepolia, una testnet);
+    // con NFT_SIMULADO=true (solo en MODE=mock) se simula en memoria para ver el flujo sin cadena.
+    nftContract: env('NFT_CONTRACT'),
+    nftPrivateKey: env('NFT_PRIVATE_KEY'),
+    nftChain: env('NFT_CHAIN', 'celoSepolia'),
+    nftRpcUrl: env('NFT_RPC_URL'),
+    nftSimulado: env('NFT_SIMULADO', 'false') === 'true',
     dashboardPassword: env('OWNER_DASHBOARD_PASSWORD'),
     trustProxy: env('TRUST_PROXY', 'false') === 'true',
     erc8004AgentId: env('ERC8004_AGENT_ID'),
     repoUrl: env('REPO_URL', 'https://github.com/AugustoGL/Agents-on-open-rail'),
     business: loadBusiness(),
   };
+  if (cfg.nftContract) {
+    if (!isAddress(cfg.nftContract)) throw new Error('NFT_CONTRACT no es una dirección válida.');
+    if (!cfg.nftPrivateKey) throw new Error('Con NFT_CONTRACT hace falta NFT_PRIVATE_KEY (una clave de TESTNET dedicada al NFT, no la del agente).');
+    cfg.nftPrivateKey = normalizePrivateKey(cfg.nftPrivateKey, 'NFT_PRIVATE_KEY');
+  }
+  if (cfg.nftSimulado && mode !== 'mock') throw new Error('NFT_SIMULADO solo se puede usar con MODE=mock.');
   if (cfg.dashboardPassword && cfg.dashboardPassword.length < 8) throw new Error('OWNER_DASHBOARD_PASSWORD tiene que tener al menos 8 caracteres.');
 
   if (mode === 'live') {

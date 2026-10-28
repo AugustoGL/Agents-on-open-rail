@@ -115,6 +115,10 @@ function migrate(db) {
   if (!columns('bookings').includes('terms')) db.exec('ALTER TABLE bookings ADD COLUMN terms TEXT');
   // Contacto opcional que deja el cliente de la web (solo lo ve el dueño).
   if (!columns('customers').includes('contact')) db.exec('ALTER TABLE customers ADD COLUMN contact TEXT');
+  // Ticket NFT de la reserva: a quién se manda, su id, qué hay en la cadena (state) y qué falta hacer (action).
+  for (const [col, tipo] of [['nft_to', 'TEXT'], ['nft_token_id', 'TEXT'], ['nft_tx', 'TEXT'], ['nft_state', 'TEXT'], ['nft_action', 'TEXT'], ['nft_attempts', 'INTEGER NOT NULL DEFAULT 0'], ['nft_error', 'TEXT']]) {
+    if (!columns('bookings').includes(col)) db.exec(`ALTER TABLE bookings ADD COLUMN ${col} ${tipo}`);
+  }
 }
 
 const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -447,5 +451,10 @@ export class Store {
   /** Reservas pagadas desde una billetera (las que ya tienen pagador), las más nuevas primero. */
   bookingsForPayer(address, limit = 50) {
     return this.db.prepare('SELECT * FROM bookings WHERE payer IS NOT NULL AND LOWER(payer) = LOWER(?) ORDER BY start_at DESC LIMIT ?').all(address, limit);
+  }
+
+  /** Reservas con algo pendiente de hacer con su NFT (emitir, quemar o marcar como jugada). */
+  nftPending(maxAttempts, limit = 50) {
+    return this.db.prepare('SELECT * FROM bookings WHERE nft_action IS NOT NULL AND nft_attempts < ? ORDER BY updated_at LIMIT ?').all(maxAttempts, limit);
   }
 }

@@ -22,7 +22,11 @@
     "pay": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/pay-booking.mjs",
     "e2e": "node --disable-warning=ExperimentalWarning scripts/e2e-browser.mjs",
     "seed": "MODE=mock node --disable-warning=ExperimentalWarning scripts/seed.mjs",
-    "capturas": "node --disable-warning=ExperimentalWarning scripts/capturas.mjs"
+    "capturas": "node --disable-warning=ExperimentalWarning scripts/capturas.mjs",
+    "nft:compile": "node scripts/nft-compile.mjs",
+    "nft:deploy": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/nft-deploy.mjs",
+    "nft:probar": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/nft-probar.mjs",
+    "nft:clave": "node scripts/nft-clave.mjs"
   },
   "dependencies": {
     "@celo/attribution-tags": "0.5.0",

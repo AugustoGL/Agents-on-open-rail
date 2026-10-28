@@ -5,6 +5,7 @@ import { loadConfig } from './config.js';
 import { BusinessSettings } from './settings.js';
 import { openDb } from './db.js';
 import { createLiveChain, createMockChain } from './chain.js';
+import { createNftClient, createSimulatedNft } from './nft.js';
 import { SenaAgent } from './agent.js';
 import { createFacilitatorClient, createPaymentServer, MockFacilitator } from './x402.js';
 import { createApp } from './server.js';
@@ -30,8 +31,12 @@ async function main() {
   // La configuración del negocio vive en la base (se edita desde /panel). config/negocio.json solo la llena la primera vez.
   const settings = new BusinessSettings(store);
   const business = settings.loadOrSeed(cfg.business);
+  // Ticket NFT (opcional): real con NFT_CONTRACT, simulado con NFT_SIMULADO, o apagado.
+  const nft = cfg.nftContract
+    ? createNftClient({ contract: cfg.nftContract, privateKey: cfg.nftPrivateKey, red: cfg.nftChain, rpcUrl: cfg.nftRpcUrl, logger })
+    : cfg.nftSimulado ? createSimulatedNft({ red: cfg.nftChain }) : null;
   const agent = new SenaAgent({
-    store, business, chain, notifier: consoleNotifier(logger), logger, settings,
+    store, business, chain, notifier: consoleNotifier(logger), logger, settings, nft,
     publicBaseUrl: cfg.publicBaseUrl, payoutAddress: cfg.payoutAddress,
   });
 
@@ -55,6 +60,7 @@ async function main() {
   const server = app.listen(cfg.port, () => {
     logger.info(`Seña escuchando en ${cfg.publicBaseUrl} (puerto ${cfg.port}) · modo ${cfg.mode} · wallet ${chain.address}`);
     logger.info(`Negocio: ${agent.business.nombre} · seña ${formatArs(agent.depositWei())} · cobra en ${cfg.payTo ?? chain.address}`);
+    logger.info(nft ? `Ticket NFT: ${nft.redNombre}${nft.simulated ? '' : ` · contrato ${nft.contract}`}` : 'Ticket NFT: apagado (ver NFT_CONTRACT en .env.example).');
     logger.info(cfg.dashboardPassword ? `Panel del comercio: ${cfg.publicBaseUrl}/panel` : 'Panel del comercio deshabilitado: falta OWNER_DASHBOARD_PASSWORD en .env.');
   });
 
@@ -87,6 +93,7 @@ async function main() {
     try {
       await agent.expireHolds();
       agent.completeFinished();
+      await agent.processNft(); // emite, quema o actualiza los tickets que falten (y reintenta los que fallaron)
     } catch (err) {
       logger.error(`[tareas] ${shortErr(err)}`);
     }

@@ -611,6 +611,10 @@ button { font: inherit; }
   .panel-contenido.con-nav-inferior { padding-bottom: var(--sp-8); }
 }
 
+/* Ticket NFT */
+.ticket-imagen { display: block; width: 100%; height: auto; border-radius: var(--r-lg); box-shadow: var(--sh-2); background: var(--surface-2); aspect-ratio: 600 / 340; }
+.ticket-estado { display: flex; gap: var(--sp-2); align-items: center; }
+
 /* --- 16. Accesibilidad extra ------------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }

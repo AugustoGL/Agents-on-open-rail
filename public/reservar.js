@@ -242,6 +242,14 @@ function renderMias() {
   setChildren($('#mis'), h('div', { class: 'pila--grande' }, nodes));
 }
 
+/** El ticket NFT de una reserva: qué pasó con él y, si ya está en la cadena, dónde verlo. */
+function textoNft(n) {
+  if (n.estado === 'enviando') return 'Enviándose a tu billetera…';
+  if (n.estado === 'error') return 'Reintentando';
+  const texto = n.estado === 'jugado' ? 'Jugado' : 'En tu billetera';
+  return n.simulado ? `${texto} (simulado)` : h('a', { href: safeHref(n.urlToken), target: '_blank', rel: 'noopener noreferrer' }, texto);
+}
+
 /** Lo primero que se lee antes de cancelar: cuánto devuelve la política. */
 function titularCancelacion(c) {
   if (c.regla === 'SIN_PAGO') return 'Todavía no pagaste: se cancela sin costo.';
@@ -257,7 +265,8 @@ function tarjeta(b) {
     h('dl', { class: 'resumen' },
       h('div', {}, h('dt', {}, 'Seña'), h('dd', { class: 'num' }, b.sena.texto, ' ', h('span', { class: 'monto-token' }, 'en wARS'))),
       b.devuelto.pesos !== '0' ? h('div', {}, h('dt', {}, 'Te devolvimos'), h('dd', { class: 'num' }, b.devuelto.texto)) : null,
-      b.estado === 'held' && b.venceEl ? h('div', {}, h('dt', {}, 'Tenés para pagar'), h('dd', {}, `${minutosRestantes(b.venceEl)} min`)) : null),
+      b.estado === 'held' && b.venceEl ? h('div', {}, h('dt', {}, 'Tenés para pagar'), h('dd', {}, `${minutosRestantes(b.venceEl)} min`)) : null,
+      b.nft ? h('div', {}, h('dt', {}, 'Ticket NFT'), h('dd', {}, textoNft(b.nft))) : null),
     b.estado === 'expired' ? aviso('info', 'No se pagó la seña a tiempo y el turno se liberó. Podés reservar de nuevo.') : null,
     b.estado === 'confirmed' ? aviso('ok', 'Turno confirmado. Si necesitás cancelar, antes de confirmar te mostramos cuánto te devolvemos.') : null);
   const c = S.confirmando;
