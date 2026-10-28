@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Guía de estilos · Seña</title>
+  <link rel="stylesheet" href="/static/css/sena.css">
+  <link rel="stylesheet" href="/static/css/guia-estilos.css">
+</head>
+<body>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+  <header class="barra">
+    <div class="barra-interior">
+      <a class="marca" href="/"><span class="marca-logo"><span class="i i-check"></span></span>Seña</a>
+      <nav class="nav-superior" aria-label="Secciones de la guía">
+        <a class="nav-link" href="#colores">Colores</a><a class="nav-link" href="#botones">Botones</a><a class="nav-link" href="#formularios">Formularios</a><a class="nav-link" href="#reserva">Reserva</a><a class="nav-link" href="#panel">Panel</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenido" class="contenedor contenedor--panel pila--grande">
+    <div class="pila">
+      <h1>Guía de estilos</h1>
+      <p class="apagado">Todo lo que se ve en Seña sale de <code>public/css/sena.css</code>: variables y componentes. Cada estado tiene siempre el mismo color y el mismo ícono, y además dice su nombre con texto.</p>
+      <div class="campo">
+        <label for="tema">Tema</label>
+        <select id="tema" class="seleccion"><option value="">Automático (el del celular)</option><option value="light">Claro</option><option value="dark">Oscuro</option></select>
+      </div>
+      <nav class="indice" aria-label="Índice">
+        <a class="btn btn-secundario btn-chico" href="#estados">Estados</a><a class="btn btn-secundario btn-chico" href="#tipografia">Tipografía</a><a class="btn btn-secundario btn-chico" href="#avisos">Avisos</a><a class="btn btn-secundario btn-chico" href="#cargando">Cargando y vacío</a><a class="btn btn-secundario btn-chico" href="#tablas">Tablas</a><a class="btn btn-secundario btn-chico" href="#navegacion">Navegación</a><a class="btn btn-secundario btn-chico" href="#ventanas">Ventanas</a><a class="btn btn-secundario btn-chico" href="#iconos">Íconos</a>
+      </nav>
+    </div>
+
+    <section id="colores" class="seccion pila">
+      <h2>Colores</h2>
+      <p class="apagado">Un color principal (verde cancha), neutros cálidos y rojo o ámbar solo para alertas.</p>
+      <div class="muestras">
+<div class="muestra"><div class="muestra-color m-bg"></div><p><strong>Fondo</strong><code>--bg</code></p></div>
+<div class="muestra"><div class="muestra-color m-surface"></div><p><strong>Tarjeta</strong><code>--surface</code></p></div>
+<div class="muestra"><div class="muestra-color m-surface-2"></div><p><strong>Tarjeta suave</strong><code>--surface-2</code></p></div>
+<div class="muestra"><div class="muestra-color m-ink"></div><p><strong>Texto</strong><code>--ink</code></p></div>
+<div class="muestra"><div class="muestra-color m-ink-muted"></div><p><strong>Texto atenuado</strong><code>--ink-muted</code></p></div>
+<div class="muestra"><div class="muestra-color m-line"></div><p><strong>Línea</strong><code>--line</code></p></div>
+<div class="muestra"><div class="muestra-color m-line-input"></div><p><strong>Borde de campo</strong><code>--line-input</code></p></div>
+<div class="muestra"><div class="muestra-color m-primary"></div><p><strong>Verde cancha</strong><code>--primary</code></p></div>
+<div class="muestra"><div class="muestra-color m-primary-hover"></div><p><strong>Verde (hover)</strong><code>--primary-hover</code></p></div>
+<div class="muestra"><div class="muestra-color m-primary-soft"></div><p><strong>Verde suave</strong><code>--primary-soft</code></p></div>
+<div class="muestra"><div class="muestra-color m-focus"></div><p><strong>Foco</strong><code>--focus</code></p></div>
+<div class="muestra"><div class="muestra-color m-danger"></div><p><strong>Peligro</strong><code>--danger</code></p></div>
+      </div>
+    </section>
+
+    <section id="estados" class="seccion pila">
+      <h2>Estados de una reserva</h2>
+      <p class="apagado">Siempre igual en la web, el panel y el registro público.</p>
+      <div class="fila">
+        <span class="estado es-confirmada">Confirmada</span>
+        <span class="estado es-esperando">Esperando pago</span>
+        <span class="estado es-cancelada">Cancelada</span>
+        <span class="estado es-vencida">Vencida</span>
+        <span class="estado es-jugada">Jugada</span>
+      </div>
+      <div class="fila">
+        <span class="estado es-libre">Libre</span>
+        <span class="estado es-bloqueada">Bloqueado</span>
+      </div>
+      <div class="muestras">
+<div class="muestra"><div class="muestra-color m-ok">Aa</div><p><strong>Confirmada</strong><code>--ok-fg / -bg / -bd</code></p></div>
+<div class="muestra"><div class="muestra-color m-wait">Aa</div><p><strong>Esperando pago</strong><code>--wait-fg / -bg / -bd</code></p></div>
+<div class="muestra"><div class="muestra-color m-bad">Aa</div><p><strong>Cancelada</strong><code>--bad-fg / -bg / -bd</code></p></div>
+<div class="muestra"><div class="muestra-color m-gone">Aa</div><p><strong>Vencida</strong><code>--gone-fg / -bg / -bd</code></p></div>
+<div class="muestra"><div class="muestra-color m-done">Aa</div><p><strong>Jugada</strong><code>--done-fg / -bg / -bd</code></p></div>
+<div class="muestra"><div class="muestra-color m-info">Aa</div><p><strong>Aviso</strong><code>--info-fg / -bg / -bd</code></p></div>
+      </div>
+    </section>
+
+    <section id="tipografia" class="seccion pila tipo-demo">
+      <h2>Tipografía</h2>
+      <p class="apagado">La del sistema: rápida, sin descargas y familiar en cada celular. Los campos usan 16 px para que iOS no haga zoom.</p>
+      <div class="tarjeta pila">
+        <h1>Reservá tu turno</h1>
+        <h2>Tenés 15 minutos para pagar la seña</h2>
+        <h3>Cancha 1 · jueves 22/10</h3>
+        <h4>Política de cancelación</h4>
+        <p>Texto normal de 16 px. Si cancelás con 24 horas o más, te devolvemos toda la seña.</p>
+        <p class="apagado">Texto atenuado para explicaciones secundarias.</p>
+        <p class="chica apagado">Letra chica: pagás $ 6.000 en wARS (el peso argentino digital).</p>
+        <p class="dato-valor num">$ 6.000 <span class="monto-token">en wARS</span></p>
+      </div>
+    </section>
+
+    <section id="botones" class="seccion pila">
+      <h2>Botones</h2>
+      <p class="apagado">48 px de alto o más (el chico, de 44 px, es solo para tablas y barras del panel).</p>
+      <div class="tarjeta demo">
+        <div class="fila">
+          <button class="btn btn-primario" type="button">Reservar</button>
+          <button class="btn btn-secundario" type="button">Elegir otro turno</button>
+          <button class="btn btn-peligro" type="button">Cancelar reserva</button>
+          <button class="btn btn-peligro-suave" type="button">Cancelar</button>
+          <button class="btn btn-fantasma" type="button">Ver política</button>
+          <button class="btn btn-secundario btn-icono" type="button" aria-label="Buscar"><span class="i i-search"></span></button>
+        </div>
+        <div class="fila">
+          <button class="btn btn-primario" type="button" disabled>Deshabilitado</button>
+          <button class="btn btn-primario" type="button" aria-busy="true" id="demo-cargando">Pagando…</button>
+          <button class="btn btn-secundario btn-chico" type="button">Botón chico</button>
+          <a class="btn btn-secundario" href="#botones"><span class="i i-external"></span>Como enlace</a>
+        </div>
+        <button class="btn btn-primario btn-grande btn-bloque" type="button"><span class="i i-wallet"></span>Conectar wallet y pagar</button>
+        <button class="btn btn-secundario btn-bloque" type="button" id="demo-btn-cargar">Probar el estado "cargando" (2 s)</button>
+      </div>
+    </section>
+
+    <section id="formularios" class="seccion pila">
+      <h2>Formularios</h2>
+      <div class="tarjeta demo">
+        <div class="campo"><label for="f1">Tu nombre</label><input id="f1" class="input" autocomplete="name" placeholder="Ej.: Marta Gómez"></div>
+        <div class="campo"><label for="f2">Contacto <span class="opcional">(opcional)</span></label><input id="f2" class="input" placeholder="Teléfono, mail o @usuario"><span class="ayuda">Solo lo ve el comercio, por si hay que avisarte algo del turno.</span></div>
+        <div class="campo"><label for="f3">Precio del turno</label><div class="input-con-unidad"><input id="f3" class="input num" inputmode="numeric" value="24000" aria-invalid="true" aria-describedby="e3"><span class="unidad">$</span></div><span class="error-campo" id="e3">Tiene que estar entre $ 100 y $ 10.000.000.</span></div>
+        <div class="campo"><label for="f4">Cancha</label><select id="f4" class="seleccion"><option>Cancha 1</option><option>Cancha 2</option></select></div>
+        <div class="campo"><label for="f5">Descripción</label><textarea id="f5" class="area" placeholder="Contá algo del comercio"></textarea></div>
+        <div class="campo"><label for="f6">Deshabilitado</label><input id="f6" class="input" value="No se puede editar" disabled></div>
+        <label class="marca-check"><input type="checkbox" checked> Si el turno se revende, devolver lo retenido</label>
+      </div>
+    </section>
+
+    <section id="avisos" class="seccion pila">
+      <h2>Avisos y carteles</h2>
+      <div class="pila--chica">
+        <div class="aviso aviso-info"><div><strong>Dato útil</strong>Podés cancelar desde "Mis reservas".</div></div>
+        <div class="aviso aviso-ok"><div><strong>¡Listo! Tu turno quedó confirmado.</strong>Te esperamos el jueves a las 20:00.</div></div>
+        <div class="aviso aviso-atencion"><div><strong>Falta poco</strong>Tenés 5 minutos para pagar la seña, después se libera el turno.</div></div>
+        <div class="aviso aviso-error"><div><strong>No se pudo guardar</strong>Revisá los campos marcados.<ul><li>El precio tiene que ser un número entero.</li></ul></div></div>
+      </div>
+      <div class="tarjeta--plana" role="group" aria-label="Carteles de la app">
+        <div class="cartel cartel--demo"><span class="i i-alert"></span><div><strong>Comercio de demostración.</strong> Los turnos y los precios son de ejemplo.</div></div>
+        <div class="cartel cartel--prueba"><span class="i i-info"></span><div><strong>MODO PRUEBA.</strong> No se mueve plata de verdad.</div></div>
+      </div>
+    </section>
+
+    <section id="cargando" class="seccion pila">
+      <h2>Cargando y estado vacío</h2>
+      <div class="grilla">
+        <div class="tarjeta"><div class="cargando" role="status"><div class="girando"></div><p>Buscando turnos…</p></div></div>
+        <div class="tarjeta pila--chica" aria-hidden="true"><div class="esqueleto esqueleto--titulo"></div><div class="esqueleto esqueleto--linea"></div><div class="esqueleto esqueleto--linea"></div><div class="esqueleto esqueleto--bloque"></div></div>
+        <div class="tarjeta"><div class="vacio"><div class="vacio-icono"><span class="i i-calendar"></span></div><h3>Todavía no tenés reservas</h3><p>Cuando reserves un turno, lo vas a ver acá con su estado.</p><a class="btn btn-primario" href="/">Reservar un turno</a></div></div>
+      </div>
+    </section>
+
+    <section id="tablas" class="seccion pila">
+      <h2>Tablas responsive</h2>
+      <p class="apagado">En celular cada fila pasa a ser una tarjeta con sus etiquetas.</p>
+      <div class="tabla-caja">
+        <table class="tabla tabla--apilada">
+          <caption class="solo-lectores">Reservas de hoy</caption>
+          <thead><tr><th scope="col">Turno</th><th scope="col">Cliente</th><th scope="col">Seña</th><th scope="col">Estado</th></tr></thead>
+          <tbody>
+            <tr><td data-label="Turno">20:00 · Cancha 1</td><td data-label="Cliente">Marta G.</td><td data-label="Seña" class="num">$ 6.000</td><td data-label="Estado"><span class="estado es-confirmada">Confirmada</span></td></tr>
+            <tr><td data-label="Turno">21:30 · Cancha 2</td><td data-label="Cliente">Beto P.</td><td data-label="Seña" class="num">$ 6.000</td><td data-label="Estado"><span class="estado es-esperando">Esperando pago</span></td></tr>
+            <tr><td data-label="Turno">18:30 · Cancha 1</td><td data-label="Cliente">Luli R.</td><td data-label="Seña" class="num">$ 6.000</td><td data-label="Estado"><span class="estado es-cancelada">Cancelada</span></td></tr>
+            <tr><td data-label="Turno">12:00 · Cancha 2</td><td data-label="Cliente">Nico S.</td><td data-label="Seña" class="num">$ 6.000</td><td data-label="Estado"><span class="estado es-vencida">Vencida</span></td></tr>
+            <tr><td data-label="Turno">09:00 · Cancha 1</td><td data-label="Cliente">Ceci T.</td><td data-label="Seña" class="num">$ 6.000</td><td data-label="Estado"><span class="estado es-jugada">Jugada</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="navegacion" class="seccion pila">
+      <h2>Navegación</h2>
+      <p class="apagado">Arriba, en pantallas grandes. Abajo, en el celular: hasta cinco destinos y el resto en "Más".</p>
+      <div class="tarjeta fila" role="group" aria-label="Barra superior de ejemplo">
+        <a class="marca" href="#navegacion"><span class="marca-logo"><span class="i i-check"></span></span>Seña</a>
+        <a class="nav-link" href="#navegacion" aria-current="page"><span class="i i-home"></span>Hoy</a>
+        <a class="nav-link" href="#navegacion"><span class="i i-calendar"></span>Calendario</a>
+        <a class="nav-link" href="#navegacion"><span class="i i-list"></span>Reservas</a>
+      </div>
+      <nav class="nav-inferior nav-inferior--estatica" aria-label="Menú inferior de ejemplo">
+        <a href="#navegacion" aria-current="page"><span class="i i-home"></span>Hoy</a>
+        <a href="#navegacion"><span class="i i-calendar"></span>Calendario</a>
+        <a href="#navegacion"><span class="i i-list"></span>Reservas</a>
+        <a href="#navegacion"><span class="i i-bell"></span>Pendientes<span class="insignia">2</span></a>
+        <button type="button"><span class="i i-dots"></span>Más</button>
+      </nav>
+      <div class="pestanas" role="group" aria-label="Pestañas de ejemplo">
+        <button class="pestana" type="button" aria-pressed="true">Día</button><button class="pestana" type="button" aria-pressed="false">Semana</button><button class="pestana" type="button" aria-pressed="false">Lista</button>
+      </div>
+    </section>
+
+    <section id="reserva" class="seccion pila--grande">
+      <h2>Flujo de reserva (cliente)</h2>
+      <div class="pila">
+        <ol class="pasos" aria-label="Pasos de la reserva">
+          <li data-hecho>Turno</li><li aria-current="step">Tus datos</li><li>Pagar</li><li>Listo</li>
+        </ol>
+        <div>
+          <h3 class="solo-lectores">Días</h3>
+          <div class="dias" role="group" aria-label="Elegí el día">
+            <button class="dia" type="button" aria-pressed="true" data-hoy><span class="dia-semana">mar</span><span class="dia-numero">27</span><span class="dia-mes">oct</span></button>
+            <button class="dia" type="button" aria-pressed="false"><span class="dia-semana">mié</span><span class="dia-numero">28</span><span class="dia-mes">oct</span></button>
+            <button class="dia" type="button" aria-pressed="false"><span class="dia-semana">jue</span><span class="dia-numero">29</span><span class="dia-mes">oct</span></button>
+            <button class="dia" type="button" aria-pressed="false"><span class="dia-semana">vie</span><span class="dia-numero">30</span><span class="dia-mes">oct</span></button>
+            <button class="dia" type="button" disabled><span class="dia-semana">sáb</span><span class="dia-numero">31</span><span class="dia-mes">oct</span></button>
+          </div>
+        </div>
+        <div class="tarjeta">
+          <div class="franja"><div class="franja-hora">18:30</div><div class="franja-canchas"><button class="turno" type="button" aria-pressed="false">Cancha 1</button><button class="turno turno--ocupado" type="button">Cancha 2<small>Lista de espera</small></button></div></div>
+          <div class="franja"><div class="franja-hora">20:00</div><div class="franja-canchas"><button class="turno" type="button" aria-pressed="true">Cancha 1</button><button class="turno" type="button" aria-pressed="false">Cancha 2</button></div></div>
+          <div class="franja"><div class="franja-hora">21:30</div><div class="franja-canchas"><button class="turno turno--bloqueado" type="button" disabled>Cancha 1<small>Mantenimiento</small></button><button class="turno" type="button" aria-pressed="false">Cancha 2</button></div></div>
+        </div>
+        <p class="leyenda"><span>Verde: libre</span><span>Punteado: ocupado, te anotás en la lista de espera</span><span>Gris con candado: no disponible</span></p>
+        <div class="cuenta" role="timer" aria-label="Tiempo para pagar"><div class="cuenta-tiempo num">14:32</div><div class="cuenta-texto">Tenés 15 minutos para pagar la seña</div></div>
+        <div class="tarjeta pila">
+          <dl class="resumen">
+            <div><dt>Turno</dt><dd>Cancha 1 · jue 29/10 · 20:00</dd></div>
+            <div><dt>Seña a pagar</dt><dd class="num">$ 6.000 <span class="monto-token">en wARS</span></dd></div>
+            <div><dt>Reserva</dt><dd class="mono">S-7K3M9Q</dd></div>
+          </dl>
+        </div>
+        <div class="comprobante">
+          <h3>¡Tu turno quedó confirmado!</h3>
+          <dl class="resumen"><div><dt>Turno</dt><dd>Cancha 1 · jue 29/10 · 20:00</dd></div><div><dt>Seña pagada</dt><dd class="num">$ 6.000</dd></div><div><dt>Comprobante</dt><dd class="mono">0x4f2a…91cd</dd></div></dl>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel" class="seccion pila">
+      <h2>Panel: calendario y datos</h2>
+      <div class="grilla">
+        <div class="tarjeta dato"><span class="dato-etiqueta">Señas cobradas hoy</span><span class="dato-valor">$ 18.000</span><span class="dato-nota">3 cobros</span></div>
+        <div class="tarjeta dato"><span class="dato-etiqueta">Saldo de la wallet</span><span class="dato-valor">$ 42.500</span><span class="dato-nota">En wARS</span></div>
+      </div>
+      <div class="grilla">
+        <button class="cal-celda es-libre" type="button">20:00<small>Libre</small></button>
+        <button class="cal-celda es-esperando" type="button">21:30<small>Esperando pago · Beto</small></button>
+        <button class="cal-celda es-confirmada" type="button">18:30<small>Confirmada · Marta</small></button>
+        <button class="cal-celda es-bloqueada" type="button">12:00<small>Bloqueado · Feriado</small></button>
+        <button class="cal-celda es-cancelada" type="button">09:00<small>Cancelada · Luli</small></button>
+        <button class="cal-celda es-jugada" type="button">10:30<small>Jugada · Ceci</small></button>
+      </div>
+    </section>
+
+    <section id="ventanas" class="seccion pila">
+      <h2>Ventanas</h2>
+      <div class="modal modal--estatico pila">
+        <h3>Cancelar la reserva S-7K3M9Q</h3>
+        <div class="aviso aviso-atencion"><div>Cancelás con 3 horas de anticipación: la seña queda para el comercio. Si el turno se revende, te la devolvemos.</div></div>
+        <div class="acciones"><button class="btn btn-secundario" type="button">Volver</button><button class="btn btn-peligro" type="button">Sí, cancelar</button></div>
+      </div>
+      <button class="btn btn-secundario" type="button" id="demo-modal">Abrir una ventana de verdad</button>
+    </section>
+
+    <section id="iconos" class="seccion pila">
+      <h2>Íconos</h2>
+      <p class="apagado">Son máscaras del color del texto: <code>&lt;span class="i i-check"&gt;&lt;/span&gt;</code>. Siempre van con texto al lado, o con <code>aria-label</code> en el botón.</p>
+      <div class="galeria-iconos">
+<div><span class="i i-check"></span><code>i-check</code></div>
+<div><span class="i i-x"></span><code>i-x</code></div>
+<div><span class="i i-clock"></span><code>i-clock</code></div>
+<div><span class="i i-hourglass"></span><code>i-hourglass</code></div>
+<div><span class="i i-flag"></span><code>i-flag</code></div>
+<div><span class="i i-info"></span><code>i-info</code></div>
+<div><span class="i i-alert"></span><code>i-alert</code></div>
+<div><span class="i i-ok"></span><code>i-ok</code></div>
+<div><span class="i i-error"></span><code>i-error</code></div>
+<div><span class="i i-calendar"></span><code>i-calendar</code></div>
+<div><span class="i i-home"></span><code>i-home</code></div>
+<div><span class="i i-list"></span><code>i-list</code></div>
+<div><span class="i i-bell"></span><code>i-bell</code></div>
+<div><span class="i i-doc"></span><code>i-doc</code></div>
+<div><span class="i i-sliders"></span><code>i-sliders</code></div>
+<div><span class="i i-wallet"></span><code>i-wallet</code></div>
+<div><span class="i i-lock"></span><code>i-lock</code></div>
+<div><span class="i i-arrow-left"></span><code>i-arrow-left</code></div>
+<div><span class="i i-chevron"></span><code>i-chevron</code></div>
+<div><span class="i i-search"></span><code>i-search</code></div>
+<div><span class="i i-external"></span><code>i-external</code></div>
+<div><span class="i i-dots"></span><code>i-dots</code></div>
+<div><span class="i i-plus"></span><code>i-plus</code></div>
+<div><span class="i i-users"></span><code>i-users</code></div>
+<div><span class="i i-shield"></span><code>i-shield</code></div>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/static/css/guia-estilos.js"></script>
+</body>
+</html>

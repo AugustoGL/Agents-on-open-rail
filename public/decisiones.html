@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F6F3EC" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141411" media="(prefers-color-scheme: dark)">
+  <title>Qué decide el agente · Seña</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/css/sena.css">
+</head>
+<body>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+  <div id="carteles"></div>
+  <div id="barra"></div>
+
+  <main id="contenido" class="contenedor pila--grande">
+    <noscript><div class="aviso aviso-error"><div>Esta página necesita JavaScript.</div></div></noscript>
+
+    <section class="pila" aria-labelledby="titulo">
+      <h1 id="titulo">Qué decide el agente por su cuenta</h1>
+      <p class="apagado">Seña no es un bot que anota turnos: maneja plata con reglas fijas, sin que el dueño intervenga. Cada vez que cobra, devuelve, retiene, libera un turno o reubica a alguien de la lista de espera, queda anotado acá con la regla que aplicó y su transacción. <strong>No se muestran nombres ni datos personales.</strong></p>
+    </section>
+
+    <section aria-labelledby="t-numeros" class="pila">
+      <h2 id="t-numeros" class="solo-lectores">Números del agente</h2>
+      <div id="numeros" class="estadisticas" aria-busy="true"></div>
+    </section>
+
+    <section class="pila" aria-labelledby="t-reglas">
+      <h2 id="t-reglas">Las reglas del comercio</h2>
+      <div class="tarjeta pila--chica">
+        <p class="apagado">Estas son las reglas que el agente aplica hoy. El comercio las puede cambiar y los cambios valen para reservas nuevas.</p>
+        <ul id="reglas" class="pila--chica"></ul>
+      </div>
+    </section>
+
+    <section class="pila" aria-labelledby="t-registro">
+      <h2 id="t-registro">Registro de decisiones</h2>
+      <div class="pestanas" id="filtros" role="group" aria-label="Filtrar por tipo"></div>
+      <div id="lista" aria-live="polite" aria-busy="true"></div>
+    </section>
+
+    <footer class="apagado chica pila--chica">
+      <p>¿Querés ver el agente en acción? <a href="/">Reservá un turno</a> y mirá cómo aparece acá.</p>
+      <p>Los mismos datos están en <code>GET /api/decisiones</code>.</p>
+    </footer>
+  </main>
+  <script type="module" src="/static/decisiones.js"></script>
+</body>
+</html>

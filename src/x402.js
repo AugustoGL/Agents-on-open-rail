@@ -55,9 +55,6 @@ export function createPaymentServer({ agent, facilitator, payTo, builderCode, lo
     if (check.booking && BigInt(ctx.requirements.amount) !== BigInt(check.booking.deposit_wei)) {
       return { abort: true, reason: 'El monto no coincide con la seña.' };
     }
-    // Con agenda externa: el turno tiene que seguir libre en el calendario del comercio. Si el calendario no responde, no se cobra.
-    const agenda = await agent.checkAgendaForPayment(check.booking);
-    if (!agenda.ok) return { abort: true, reason: agenda.reason };
     return undefined;
   });
 

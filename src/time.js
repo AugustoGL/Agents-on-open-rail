@@ -50,3 +50,17 @@ export function addDays(dateStr, days) {
 export function startOfLocalDay(ms, offsetMin) {
   return localToUtcMs(localDateStr(ms, offsetMin), '00:00', offsetMin);
 }
+
+/** Día de la semana de una fecha local "YYYY-MM-DD": 0 = domingo ... 6 = sábado. */
+export function weekdayOf(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/** ¿Es una fecha "YYYY-MM-DD" que existe de verdad? */
+export function isValidDateStr(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+}

@@ -32,12 +32,12 @@ export function recordingNotifier() {
 }
 
 /** Agente listo para probar: lunes 19/10/2026 10:00 hora de Córdoba. */
-export function makeAgent({ nowLocal = ['2026-10-19', '10:00'], payoutAddress = '0x000000000000000000000000000000000000dEaD', balance = 0n, agenda } = {}) {
+export function makeAgent({ nowLocal = ['2026-10-19', '10:00'], payoutAddress = '0x000000000000000000000000000000000000dEaD', balance = 0n } = {}) {
   const store = openDb(':memory:');
   const clock = fakeClock(localToUtcMs(nowLocal[0], nowLocal[1], OFFSET));
   const chain = createMockChain({ initialBalanceWei: balance, logger: silent });
   const notifier = recordingNotifier();
-  const agent = new SenaAgent({ store, business, chain, clock, notifier, logger: silent, publicBaseUrl: 'http://test.local', payoutAddress, agenda });
+  const agent = new SenaAgent({ store, business, chain, clock, notifier, logger: silent, publicBaseUrl: 'http://test.local', payoutAddress });
   return { agent, store, clock, chain, notifier };
 }
 

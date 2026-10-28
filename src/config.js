@@ -3,18 +3,24 @@ import { readFileSync } from 'node:fs';
 import { isAddress, getAddress } from 'viem';
 import { normalizePrivateKey } from './keys.js';
 import { DEFAULT_FACILITATOR_URL, DEFAULT_RPC_URL, FEE_CURRENCIES } from './constants.js';
+import { validateBusiness, DEFAULT_CLOSE_TIME } from './settings.js';
 
 const env = (k, d = undefined) => {
   const v = process.env[k];
   return v === undefined || v.trim() === '' ? d : v.trim();
 };
 
+/**
+ * Valores iniciales del negocio (config/negocio.json). Solo se usan para llenar la base la primera vez:
+ * después la configuración vive en SQLite y se edita desde el panel.
+ */
 export function loadBusiness(path = env('BUSINESS_CONFIG', new URL('../config/negocio.json', import.meta.url))) {
-  const b = JSON.parse(readFileSync(path, 'utf8'));
-  const need = ['nombre', 'utcOffsetMinutos', 'recursos', 'horarios', 'duracionMinutos', 'precioTurnoArs', 'senaPorcentaje', 'politica', 'limites'];
-  for (const k of need) if (b[k] === undefined) throw new Error(`Falta "${k}" en la configuración del negocio.`);
-  if (!b.horarios.every((h) => /^\d{2}:\d{2}$/.test(h))) throw new Error('Los horarios tienen que ser HH:MM.');
-  return b;
+  const raw = JSON.parse(readFileSync(path, 'utf8'));
+  // La hora del cierre inicial puede venir de CIERRE_HORA (compatibilidad con versiones anteriores).
+  raw.cierre = { ...raw.cierre, hora: raw.cierre?.hora ?? env('CIERRE_HORA', DEFAULT_CLOSE_TIME) };
+  const v = validateBusiness(raw);
+  if (!v.ok) throw new Error(`Configuración del negocio inválida (${path}): ${v.errors.map((e) => e.mensaje).join(' ')}`);
+  return v.business;
 }
 
 export function loadConfig() {
@@ -46,14 +52,14 @@ export function loadConfig() {
     ownerChatId: env('OWNER_CHAT_ID'),
     anthropicApiKey: env('ANTHROPIC_API_KEY'),
     anthropicModel: env('ANTHROPIC_MODEL', 'claude-haiku-5-5'),
-    closeTime: env('CIERRE_HORA', '23:30'),
+    closeTime: env('CIERRE_HORA', DEFAULT_CLOSE_TIME),
+    dashboardPassword: env('OWNER_DASHBOARD_PASSWORD'),
+    trustProxy: env('TRUST_PROXY', 'false') === 'true',
     erc8004AgentId: env('ERC8004_AGENT_ID'),
-    // Agenda en Google Calendar: si falta alguna de las dos variables se usa la grilla propia (modo por defecto).
-    googleServiceAccountPath: env('GOOGLE_SERVICE_ACCOUNT_JSON_PATH'),
-    googleCalendarId: env('GOOGLE_CALENDAR_ID'),
     repoUrl: env('REPO_URL', 'https://github.com/AugustoGL/Agents-on-open-rail'),
     business: loadBusiness(),
   };
+  if (cfg.dashboardPassword && cfg.dashboardPassword.length < 8) throw new Error('OWNER_DASHBOARD_PASSWORD tiene que tener al menos 8 caracteres.');
 
   if (mode === 'live') {
     const missing = [];

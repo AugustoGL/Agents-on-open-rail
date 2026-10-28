@@ -1,0 +1,30 @@
+/* Solo para la página de la guía de estilos: muestras de color. El sistema de diseño está en sena.css. */
+.muestras { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: var(--sp-3); }
+.muestra { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; background: var(--surface); font-size: var(--fs-xs); }
+.muestra-color { height: 3.5rem; border-bottom: 1px solid var(--line); }
+.muestra p { padding: var(--sp-2) var(--sp-3); }
+.muestra code { display: block; color: var(--ink-muted); }
+.m-bg { background: var(--bg); }
+.m-surface { background: var(--surface); }
+.m-surface-2 { background: var(--surface-2); }
+.m-ink { background: var(--ink); }
+.m-ink-muted { background: var(--ink-muted); }
+.m-line { background: var(--line); }
+.m-line-input { background: var(--line-input); }
+.m-primary { background: var(--primary); }
+.m-primary-hover { background: var(--primary-hover); }
+.m-primary-soft { background: var(--primary-soft); }
+.m-focus { background: var(--focus); }
+.m-danger { background: var(--danger); }
+.m-ok { background: var(--ok-bg); border: 3px solid var(--ok-bd); color: var(--ok-fg); display: grid; place-items: center; font-weight: 800; font-size: var(--fs-md); }
+.m-wait { background: var(--wait-bg); border: 3px solid var(--wait-bd); color: var(--wait-fg); display: grid; place-items: center; font-weight: 800; font-size: var(--fs-md); }
+.m-bad { background: var(--bad-bg); border: 3px solid var(--bad-bd); color: var(--bad-fg); display: grid; place-items: center; font-weight: 800; font-size: var(--fs-md); }
+.m-gone { background: var(--gone-bg); border: 3px solid var(--gone-bd); color: var(--gone-fg); display: grid; place-items: center; font-weight: 800; font-size: var(--fs-md); }
+.m-done { background: var(--done-bg); border: 3px solid var(--done-bd); color: var(--done-fg); display: grid; place-items: center; font-weight: 800; font-size: var(--fs-md); }
+.m-info { background: var(--info-bg); border: 3px solid var(--info-bd); color: var(--info-fg); display: grid; place-items: center; font-weight: 800; font-size: var(--fs-md); }
+.galeria-iconos { display: grid; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: var(--sp-2); }
+.galeria-iconos div { display: grid; justify-items: center; gap: var(--sp-1); padding: var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); font-size: var(--fs-xs); color: var(--ink-muted); }
+.galeria-iconos .i { width: 1.75rem; height: 1.75rem; color: var(--ink); }
+.seccion { scroll-margin-top: 5rem; }
+.demo { display: grid; gap: var(--sp-4); }
+.indice { display: flex; flex-wrap: wrap; gap: var(--sp-2); }

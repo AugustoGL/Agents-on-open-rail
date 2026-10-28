@@ -19,7 +19,10 @@
     "probe": "node --env-file-if-exists=.env scripts/probe.mjs",
     "register": "node --env-file-if-exists=.env scripts/register-agent.mjs",
     "verify-tag": "node --env-file-if-exists=.env scripts/verify-tag.mjs",
-    "pay": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/pay-booking.mjs"
+    "pay": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/pay-booking.mjs",
+    "e2e": "node --disable-warning=ExperimentalWarning scripts/e2e-browser.mjs",
+    "seed": "MODE=mock node --disable-warning=ExperimentalWarning scripts/seed.mjs",
+    "capturas": "node --disable-warning=ExperimentalWarning scripts/capturas.mjs"
   },
   "dependencies": {
     "@celo/attribution-tags": "0.5.0",

@@ -78,7 +78,44 @@ CREATE TABLE IF NOT EXISTS customers (
   chat_id TEXT,
   created_at INTEGER NOT NULL
 );
+
+-- Ajustes del negocio (clave -> JSON) y el registro de cada cambio.
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS settings_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at INTEGER NOT NULL,
+  actor TEXT NOT NULL,
+  field TEXT NOT NULL,
+  old_value TEXT,
+  new_value TEXT
+);
+
+-- Bloqueos: un turno, una cancha o un día entero que no se pueden reservar. Intervalo [from_at, to_at) en UTC.
+CREATE TABLE IF NOT EXISTS blocks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  resource TEXT,
+  from_at INTEGER NOT NULL,
+  to_at INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  created_by TEXT,
+  removed_at INTEGER
+);
 `;
+
+/** Agrega columnas nuevas a bases creadas con versiones anteriores. */
+function migrate(db) {
+  const columns = (table) => db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  // Condiciones con las que se pagó cada reserva (política, precio, seña): los cambios de configuración no las tocan.
+  if (!columns('bookings').includes('terms')) db.exec('ALTER TABLE bookings ADD COLUMN terms TEXT');
+  // Contacto opcional que deja el cliente de la web (solo lo ve el dueño).
+  if (!columns('customers').includes('contact')) db.exec('ALTER TABLE customers ADD COLUMN contact TEXT');
+}
 
 const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 export function newBookingId() {
@@ -93,6 +130,7 @@ export function openDb(path = ':memory:') {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA);
+  migrate(db);
   return new Store(db);
 }
 
@@ -119,10 +157,10 @@ export class Store {
   insertBooking(b) {
     this.db.prepare(`INSERT INTO bookings
       (id, resource, start_at, customer_id, customer_name, channel, source, status, deposit_wei,
-       hold_expires_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+       hold_expires_at, terms, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       b.id, b.resource, b.start_at, b.customer_id, b.customer_name ?? null, b.channel, b.source ?? 'directa',
-      b.status, String(b.deposit_wei), b.hold_expires_at ?? null, b.created_at, b.created_at,
+      b.status, String(b.deposit_wei), b.hold_expires_at ?? null, b.terms ? JSON.stringify(b.terms) : null, b.created_at, b.created_at,
     );
     return this.getBooking(b.id);
   }
@@ -297,14 +335,112 @@ export class Store {
 
   // --- Clientes -----------------------------------------------------------
   upsertCustomer(c) {
-    this.db.prepare(`INSERT INTO customers (id, name, channel, wallet, chat_id, created_at) VALUES (?, ?, ?, ?, ?, ?)
+    this.db.prepare(`INSERT INTO customers (id, name, channel, wallet, chat_id, contact, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET name = COALESCE(excluded.name, customers.name),
-        wallet = COALESCE(excluded.wallet, customers.wallet), chat_id = COALESCE(excluded.chat_id, customers.chat_id)`)
-      .run(c.id, c.name ?? null, c.channel, c.wallet ?? null, c.chat_id ?? null, c.created_at);
+        wallet = COALESCE(excluded.wallet, customers.wallet), chat_id = COALESCE(excluded.chat_id, customers.chat_id),
+        contact = COALESCE(excluded.contact, customers.contact)`)
+      .run(c.id, c.name ?? null, c.channel, c.wallet ?? null, c.chat_id ?? null, c.contact ?? null, c.created_at);
     return this.getCustomer(c.id);
   }
 
   getCustomer(id) {
     return this.db.prepare('SELECT * FROM customers WHERE id = ?').get(id) ?? null;
+  }
+
+  // --- Ajustes del negocio ------------------------------------------------
+  getSetting(key) {
+    const row = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+    return row ? JSON.parse(row.value) : null;
+  }
+
+  setSetting(key, value, now) {
+    this.db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`).run(key, JSON.stringify(value), now);
+  }
+
+  logSettingChange({ at, actor, field, oldValue, newValue }) {
+    this.db.prepare('INSERT INTO settings_log (at, actor, field, old_value, new_value) VALUES (?, ?, ?, ?, ?)').run(
+      at, actor, field,
+      oldValue === undefined ? null : JSON.stringify(oldValue),
+      newValue === undefined ? null : JSON.stringify(newValue),
+    );
+  }
+
+  settingsLog({ limit = 50 } = {}) {
+    return this.db.prepare('SELECT * FROM settings_log ORDER BY id DESC LIMIT ?').all(limit).map((r) => ({
+      ...r, old_value: r.old_value === null ? null : JSON.parse(r.old_value), new_value: r.new_value === null ? null : JSON.parse(r.new_value),
+    }));
+  }
+
+  /** Cambia el nombre de una cancha en todas las tablas (reservas, lista de espera y bloqueos). */
+  renameResource(oldName, newName) {
+    for (const table of ['bookings', 'waitlist', 'blocks']) {
+      this.db.prepare(`UPDATE ${table} SET resource = ? WHERE resource = ?`).run(newName, oldName);
+    }
+  }
+
+  // --- Bloqueos -----------------------------------------------------------
+  insertBlock(b) {
+    const info = this.db.prepare(`INSERT INTO blocks (kind, resource, from_at, to_at, reason, created_at, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(b.kind, b.resource ?? null, b.from_at, b.to_at, b.reason, b.created_at, b.created_by ?? null);
+    return this.getBlock(Number(info.lastInsertRowid));
+  }
+
+  getBlock(id) {
+    return this.db.prepare('SELECT * FROM blocks WHERE id = ?').get(id) ?? null;
+  }
+
+  /** Bloqueos vigentes que se pisan con [fromMs, toMs). */
+  blocksOverlapping(fromMs, toMs) {
+    return this.db.prepare('SELECT * FROM blocks WHERE removed_at IS NULL AND from_at < ? AND to_at > ? ORDER BY from_at, id').all(toMs, fromMs);
+  }
+
+  /** Bloqueos vigentes que todavía no terminaron. */
+  activeBlocks(nowMs) {
+    return this.db.prepare('SELECT * FROM blocks WHERE removed_at IS NULL AND to_at > ? ORDER BY from_at, id').all(nowMs);
+  }
+
+  removeBlock(id, now) {
+    this.db.prepare('UPDATE blocks SET removed_at = ? WHERE id = ? AND removed_at IS NULL').run(now, id);
+  }
+
+  // --- Consultas para el panel --------------------------------------------
+  /** Reservas con el cliente, filtrables. El texto busca en el id, el nombre y el contacto. */
+  searchBookings({ status, fromMs, toMs, q, limit = 100 } = {}) {
+    const where = []; const params = [];
+    if (status) { where.push('b.status = ?'); params.push(status); }
+    if (fromMs != null) { where.push('b.start_at >= ?'); params.push(fromMs); }
+    if (toMs != null) { where.push('b.start_at < ?'); params.push(toMs); }
+    if (q) {
+      const like = `%${String(q).replace(/[\\%_]/g, '\\$&')}%`;
+      where.push("(b.id LIKE ? ESCAPE '\\' OR b.customer_name LIKE ? ESCAPE '\\' OR c.contact LIKE ? ESCAPE '\\')");
+      params.push(like, like, like);
+    }
+    return this.db.prepare(`SELECT b.*, c.contact AS customer_contact FROM bookings b LEFT JOIN customers c ON c.id = b.customer_id
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY b.start_at DESC, b.id LIMIT ?`).all(...params, limit);
+  }
+
+  /** Reservas vigentes (esperando pago o confirmadas) cuyo turno arranca dentro de [fromMs, toMs). */
+  activeBookingsStartingIn(fromMs, toMs) {
+    return this.activeBookingsBetween(fromMs, toMs);
+  }
+
+  waitingCount() {
+    return this.db.prepare("SELECT COUNT(*) AS n FROM waitlist WHERE status IN ('waiting','offered')").get().n;
+  }
+
+  // --- Números públicos del agente (sin datos personales) --------------------
+  decisionCounts() {
+    const rows = this.db.prepare('SELECT rule, COUNT(*) AS n FROM decisions GROUP BY rule').all();
+    return Object.fromEntries(rows.map((r) => [r.rule, r.n]));
+  }
+
+  decisionsSummary() {
+    return this.db.prepare('SELECT COUNT(*) AS total, MIN(at) AS desde FROM decisions').get();
+  }
+
+  sentRefundsTotal() {
+    return this.db.prepare("SELECT amount_wei FROM transfers WHERE kind = 'refund' AND status = 'sent'").all()
+      .reduce((acc, r) => acc + BigInt(r.amount_wei), 0n);
   }
 }
