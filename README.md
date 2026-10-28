@@ -6,7 +6,7 @@
 
 > Hecho para **Agents on Open Rails** (Celo · Loops House), track **Stable Agents LatAm**. El negocio de este repo, "Pádel Demo", es un **comercio de demostración**: los turnos y precios son de ejemplo. **Agentes de otros participantes pueden reservar y pagar por API** (x402 estándar).
 
-*English summary: Seña is an autonomous deposit agent for appointment-based businesses in Argentina. It collects booking deposits in wARS on Celo mainnet via x402 (Permit2, gasless for the payer), applies a deterministic cancellation policy, re-sells freed slots to a waitlist, refunds retained deposits when a slot is resold, and settles the day to the owner. Customers book through Telegram, a web page or the API; the owner runs the business from a password-protected dashboard (editable settings stored in SQLite, blocks for holidays/maintenance, manual refunds, approvals). Every transaction the agent sends carries its ERC-8021 attribution tag; its identity is registered under ERC-8004. The demo business is a demonstration shop, and other participants' agents can book through the API.*
+*English summary: Seña is an autonomous deposit agent for appointment-based businesses in Argentina. It collects booking deposits in wARS on Celo mainnet via x402 (Permit2, gasless for the payer), applies a deterministic cancellation policy, re-sells freed slots to a waitlist, refunds retained deposits when a slot is resold, and settles the day to the owner. Customers book through Telegram, a web page or the API; the owner runs the business from a password-protected dashboard (editable settings stored in SQLite, blocks for holidays/maintenance, manual refunds, approvals). Every transaction the agent sends carries its ERC-8021 attribution tag; its identity is registered under ERC-8004. Once paid, the reservation is also tied to the payer's wallet: the customer can sign a gasless message to see and cancel their bookings from any device, and the agent mints an untransferable ERC-721 ticket (ERC-5192, `contracts/SenaTicket.sol`) to the paying wallet — burned on cancellation, marked as played afterwards — on Celo Sepolia by default. The demo business is a demonstration shop, and other participants' agents can book through the API.*
 
 ## Por qué es un agente y no un bot
 
@@ -35,14 +35,42 @@ Cada decisión queda registrada con su regla y su transacción: `/decisiones` (p
 
 Para pagar con una persona: abre el link en MetaMask o MiniPay y firma (sin gas). Si no tiene wARS, la página la manda a cargar pesos con Ripio. Las tres vías comparten las mismas reglas.
 
+## Tu reserva en tu billetera
+
+La billetera que pagó la seña es la dueña de la reserva. Hay dos formas de verlo, y las dos son opcionales:
+
+| | Qué es | Cuesta | Dónde |
+|---|---|---|---|
+| **Ver mis reservas con la billetera** | La persona firma un mensaje de un solo uso y se le muestran todas las reservas pagadas desde esa dirección, en cualquier dispositivo. Puede ver qué devolvería la política y cancelar: la seña vuelve a la misma billetera. Un agente de IA que pagó por x402 puede hacer lo mismo. | Nada (firmar no cuesta gas) | `/` → "Mis reservas" |
+| **Ticket NFT** | Al confirmarse el pago, el agente le manda un NFT **intransferible** con la imagen y los datos del turno. | Gas del agente (centavos; en testnet, nada) | La billetera, el explorador, `/pagar/:id` |
+
+**Cómo se firma:** conectar la billetera no alcanza, porque las direcciones son públicas. El servidor da un mensaje con un código de un solo uso, la billetera, el sitio y un vencimiento de 5 minutos; con la firma válida abre una sesión corta (15 minutos). Solo billeteras comunes (EOA: MetaMask, MiniPay). Las reservas sin pagar todavía no tienen billetera.
+
+**El ticket NFT** (`contracts/SenaTicket.sol`, ERC-721 + ERC-5192):
+
+| Momento | Qué pasa con el ticket |
+|---|---|
+| Se confirma el pago | Se emite a la billetera que pagó (o a la que se eligió en el pago de prueba) |
+| Se cancela la reserva | Se quema: la billetera solo muestra reservas vigentes |
+| Se juega el turno | Se marca "jugada" y queda de recuerdo |
+| La cadena falla | La reserva queda confirmada igual; el ticket se reintenta solo (5 veces) y después el dueño puede reintentar desde el panel |
+
+- **Intransferible:** el ticket es de quien pagó, así que la devolución nunca es ambigua. Solo el agente emite, actualiza y quema.
+- **Sin duplicados:** el id sale del código de la reserva; emitir dos veces la misma falla en el contrato, así que reintentar es seguro.
+- **Sin servidor:** la imagen y los datos viajan dentro del contrato (`tokenURI`), así que se ven en la billetera aunque Seña esté apagada.
+- **Dónde:** Celo Sepolia (testnet) por defecto; `NFT_CHAIN=sepolia` o `celo`. En Celo mainnet cada ticket es una transacción del agente con su tag ERC-8021.
+- **Apagado por defecto:** sin `NFT_CONTRACT` no hay NFT; con `NFT_SIMULADO=true` (solo `MODE=mock`) se simula en memoria y la pantalla lo dice.
+- **Privacidad:** queda público en la cadena que una billetera reservó tal cancha a tal hora (sin nombres).
+
+Despliegue y uso: GUIA, sección 14.
+
 ## La interfaz
 
 Pensada primero para el celular (390 px), con modo claro y oscuro automático, botones de 48 px o más, foco visible y contraste AA verificado por test. Un solo sistema de diseño (`public/css/sena.css`) y una guía que muestra todos los componentes: **`/guia-estilos`**.
 
 - **Web de reservas (`/`)**: tira de días, turnos agrupados por hora con las canchas, formulario corto y pago. El token (wARS) va en letra chica: "$ 6.000 *en wARS*".
 - **Pago (`/pagar/:id`)**: resumen, cuenta regresiva, conectar billetera y pagar, ayuda para quien no tiene wARS y todos los estados (sin billetera, red equivocada, sin saldo, firma rechazada, vencida, ya pagada). En **MODO PRUEBA** hay un botón "Pagar de prueba" que recorre el pago completo sin billetera (usa el mismo camino x402; no existe con la cadena real).
-- **Mis reservas con la billetera**: en "Mis reservas", "Ver mis reservas con mi billetera" pide firmar un mensaje de un solo uso (no cuesta gas ni mueve plata). Con esa firma se muestran todas las reservas pagadas desde esa dirección, en cualquier dispositivo, y se pueden cancelar (la seña vuelve a la misma billetera). También lo puede usar un agente de IA que pagó por x402. Solo billeteras comunes (EOA, como MetaMask y MiniPay); las reservas sin pagar todavía no tienen billetera y siguen en el navegador.
-- **Ticket NFT de la reserva**: al confirmarse el pago, el agente le manda a la billetera que pagó un **NFT intransferible** (ERC-721 + ERC-5192, `contracts/SenaTicket.sol`) con la imagen y los datos del turno guardados en el propio contrato. Cancelar lo quema, jugar el turno lo marca como "jugada". Por defecto en **Celo Sepolia** (testnet). Es opcional y la reserva nunca depende de él: si la cadena falla, el ticket se reintenta solo. Ver la GUIA, sección 14.
+- **Mis reservas con la billetera** y **ticket NFT**: ver la sección anterior. La confirmación del pago muestra la imagen del ticket, su estado y "Agregar a mi billetera".
 - **Registro público (`/decisiones`)**: lo que decide el agente, en castellano, con la regla aplicada y la transacción; con números del agente y sin datos personales.
 - **Panel (`/panel`)**: menú inferior en el celular y barra lateral en pantallas grandes.
 
@@ -60,6 +88,7 @@ Seguridad del panel: clave comparada en tiempo constante, límite de intentos, c
 - **x402 v2** con el facilitador de Celo (`api.x402.celo.org`), esquema `exact` con **Permit2**: el cliente no paga gas.
 - **ERC-8021**: todas las transacciones que manda la wallet del agente (devoluciones, retiros, registro) llevan el tag, vía `@celo/attribution-tags`.
 - **ERC-8004**: identidad del agente registrada desde su propia wallet (`agent.json`).
+- **ERC-721 + ERC-5192**: el ticket NFT intransferible de cada reserva (`contracts/SenaTicket.sol`), en Celo Sepolia por defecto.
 - **Fee abstraction (CIP-64)**: opcionalmente el agente paga su gas en USA₮/USDC en vez de CELO (`FEE_CURRENCY`).
 
 ## Arquitectura
@@ -68,7 +97,8 @@ Seguridad del panel: clave comparada en tiempo constante, límite de intentos, c
 Telegram (grammY) ─┐                 ┌─ x402 (cobro, Permit2) ── facilitador de Celo
 Web  /  ───────────┤                 │
 API REST ──────────┼─► SenaAgent ────┤
-Panel /panel ──────┘   (decisiones)  └─ wallet del agente ── devoluciones / retiro en wARS (con tag)
+Panel /panel ──────┘   (decisiones)  ├─ wallet del agente ── devoluciones / retiro en wARS (con tag)
+                          │          └─ SenaTicket (NFT) ── un ticket por reserva (Celo Sepolia / mainnet)
                           │
                        SQLite (reservas, lista de espera, decisiones, transferencias, ajustes, bloqueos)
 ```
@@ -108,6 +138,15 @@ Para mainnet ver **[GUIA.md](GUIA.md)** (paso a paso en castellano).
 - "Mis reservas" en la web se guarda en el navegador: si se borra o se cambia de dispositivo, se pierde el acceso (las reservas siguen existiendo y se pueden gestionar desde el panel). Los clientes de la web no reciben avisos: ven el estado en "Mis reservas".
 - La rampa pesos → wARS es la de Ripio (link a `ramp.ripio.com`); el agente no toca cuentas bancarias.
 - El primer pago de una wallet puede necesitar una aprobación de Permit2 con gas si wARS no soporta `permit` (EIP-2612); `npm run probe` lo verifica y la página lo ofrece cuando hace falta.
+- El ticket NFT se despliega por defecto en una **testnet** (Celo Sepolia): sirve para mostrar el flujo, pero la puntuación del hackathon cuenta solo la actividad en Celo mainnet. Para que cada ticket sea una transacción del agente en mainnet hay que desplegar con `NFT_CHAIN=celo` (ver GUIA, sección 14).
+- "Ver mis reservas con la billetera" funciona con billeteras comunes (EOA); las billeteras de contrato no están soportadas todavía.
 - La custodia es de una wallet caliente del agente con saldo chico y topes; el resto se retira al dueño cada noche.
+
+## Documentos
+
+- **[GUIA.md](GUIA.md)** — paso a paso para correrlo, llevarlo a mainnet y desplegar el NFT.
+- **[PENDIENTES.md](PENDIENTES.md)** — lo que falta hacer, en orden, con los comandos.
+- **[ENTREGA.md](ENTREGA.md)** — todo lo que hay que entregar: textos para el formulario, evidencia, guion del video y chequeo final.
+- **`docs/capturas/`** — cada pantalla en celular y escritorio, claro y oscuro.
 
 Licencia MIT.

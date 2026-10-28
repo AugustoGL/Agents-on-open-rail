@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createPublicClient, createWalletClient, http, keccak256, toHex, getAddress } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { celoSepolia, sepolia, celo } from 'viem/chains';
+import { withAttribution } from '@celo/attribution-tags';
 
 export const ARTEFACTO = JSON.parse(readFileSync(new URL('../contracts/SenaTicket.json', import.meta.url), 'utf8'));
 
@@ -68,17 +69,20 @@ export const tokenUri = (metadata) => `data:application/json;base64,${Buffer.fro
 const notSent = (err) => Object.assign(err, { notSent: true });
 
 /**
- * Cliente real: manda las transacciones desde la billetera del agente (clave de TESTNET dedicada, nunca la del modo real).
+ * Cliente real: manda las transacciones desde la billetera del agente (en testnet, una clave de TESTNET dedicada; en Celo mainnet, la
+ * billetera registrada del agente, y cada transacción lleva su tag de atribución ERC-8021 si se le pasa `tag`).
  * Si la simulación falla, no sale nada (notSent); si salió y no se sabe, el reintento es seguro porque emitir, actualizar
  * y quemar son idempotentes (se revisa antes con exists()).
  */
-export function createNftClient({ contract, privateKey, red = 'celoSepolia', rpcUrl, logger = console }) {
+export function createNftClient({ contract, privateKey, red = 'celoSepolia', rpcUrl, tag, logger = console }) {
   const r = REDES_NFT[red];
   if (!r) throw new Error(`NFT_CHAIN desconocida: ${red}. Usá celoSepolia, sepolia o celo.`);
   const account = privateKeyToAccount(privateKey);
   const transport = http(rpcUrl ?? r.chain.rpcUrls.default.http[0]);
   const pub = createPublicClient({ chain: r.chain, transport });
-  const wallet = createWalletClient({ account, chain: r.chain, transport });
+  const base = createWalletClient({ account, chain: r.chain, transport });
+  // El tag solo importa en Celo mainnet: ahí cada ticket emitido es una transacción atribuida a este proyecto.
+  const wallet = tag && red === 'celo' ? base.extend(withAttribution(tag)) : base;
   const address = getAddress(contract);
   const abi = ARTEFACTO.abi;
 

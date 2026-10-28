@@ -247,6 +247,7 @@ Cómo se usa en la app:
 - **Sin `NFT_CONTRACT`:** el NFT queda apagado. Con `NFT_SIMULADO=true` (solo en `MODE=mock`) se simula en memoria, y la pantalla dice "Simulación": sirve para mostrar el flujo sin cadena.
 - **Si la cadena falla:** la reserva queda confirmada igual y el ticket se reintenta solo (hasta 5 veces). Después aparece en el panel con "Reintentar el ticket NFT".
 - **Otras redes:** `NFT_CHAIN=sepolia` (Ethereum Sepolia) o `celo` (mainnet: `nft:deploy` exige `--mainnet` y cuesta plata real).
+- **Celo mainnet y la puntuación:** el hackathon cuenta solo la actividad en mainnet. Con `NFT_CHAIN=celo`, cada ticket es una transacción del agente y **lleva su tag ERC-8021** (`ATTRIBUTION_TAG`). Para que se acredite, `NFT_PRIVATE_KEY` tiene que ser la clave de **la billetera del agente registrada en la entrega** (en testnet, en cambio, usá una clave aparte). Probalo primero en Sepolia.
 
 Para volver a compilar el contrato (solo si lo cambiás): `npm install --no-save solc@0.8.24` y `npm run nft:compile`. La prueba del contrato en una EVM local: `contracts/probar/SenaTicket.ganache.mjs`.
 

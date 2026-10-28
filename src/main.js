@@ -33,7 +33,7 @@ async function main() {
   const business = settings.loadOrSeed(cfg.business);
   // Ticket NFT (opcional): real con NFT_CONTRACT, simulado con NFT_SIMULADO, o apagado.
   const nft = cfg.nftContract
-    ? createNftClient({ contract: cfg.nftContract, privateKey: cfg.nftPrivateKey, red: cfg.nftChain, rpcUrl: cfg.nftRpcUrl, logger })
+    ? createNftClient({ contract: cfg.nftContract, privateKey: cfg.nftPrivateKey, red: cfg.nftChain, rpcUrl: cfg.nftRpcUrl, tag: cfg.attributionTag, logger })
     : cfg.nftSimulado ? createSimulatedNft({ red: cfg.nftChain }) : null;
   const agent = new SenaAgent({
     store, business, chain, notifier: consoleNotifier(logger), logger, settings, nft,
