@@ -19,7 +19,7 @@ before(async () => {
   resumen = await sembrar({ store });
   const business = new BusinessSettings(store).loadOrSeed(() => loadBusiness());
   const agent = new SenaAgent({ store, business, chain: createMockChain({ logger: silent }), logger: silent });
-  const app = createApp({ agent, logger: silent, dashboardPassword: 'clave-de-prueba-123' });
+  const app = createApp({ agent, logger: silent, dashboardPassword: 'TEST_ONLY_fake_password_123' });
   await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
   base = `http://127.0.0.1:${server.address().port}`;
 });

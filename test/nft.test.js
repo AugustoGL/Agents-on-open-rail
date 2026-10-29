@@ -210,7 +210,7 @@ before(async () => {
   ctxHttp = conNft();
   const facilitator = new MockFacilitator({ chain: ctxHttp.chain, logger: silent });
   const payments = createPaymentServer({ agent: ctxHttp.agent, facilitator, payTo: ctxHttp.chain.address, builderCode: null, logger: silent });
-  const app = createApp({ agent: ctxHttp.agent, payments, logger: silent, dashboardPassword: 'clave-de-prueba-123', createLimit: { windowMs: 60_000, max: 500 } });
+  const app = createApp({ agent: ctxHttp.agent, payments, logger: silent, dashboardPassword: 'TEST_ONLY_fake_password_123', createLimit: { windowMs: 60_000, max: 500 } });
   await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
   base = `http://127.0.0.1:${server.address().port}`;
   ctxHttp.agent.publicBaseUrl = base;
@@ -243,7 +243,7 @@ test('pago de prueba con billetera conectada: el ticket NFT va a esa billetera y
 });
 
 test('el panel ve el ticket de cada reserva y puede reintentarlo (con CSRF)', async () => {
-  const login = await fetch(`${base}/panel/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clave: 'clave-de-prueba-123' }) });
+  const login = await fetch(`${base}/panel/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clave: 'TEST_ONLY_fake_password_123' }) });
   const cookie = login.headers.getSetCookie()[0].split(';')[0];
   const { csrf } = await login.json();
   const lista = await (await fetch(`${base}/panel/api/reservas?estado=confirmed`, { headers: { cookie } })).json();
