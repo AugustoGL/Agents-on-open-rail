@@ -27,7 +27,6 @@
     "nft:deploy": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/nft-deploy.mjs",
     "nft:probar": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/nft-probar.mjs",
     "nft:clave": "node scripts/nft-clave.mjs",
-    "video": "node --disable-warning=ExperimentalWarning video/render/render.mjs full",
     "nft:verificar": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/nft-verificar.mjs"
   },
   "dependencies": {

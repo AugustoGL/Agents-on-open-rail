@@ -31,14 +31,7 @@ venv/
 .idea/
 .DS_Store
 
-# Video de referencia (solo para analizar el estilo; no se sube)
-video/*.mp4
-video/*.mov
-video/*.wav
-video/_analisis/
 
-# Salidas del render del video (se regeneran con `npm run video`)
-video/out/
 
 # Instaladores y paquetes sueltos
 *.deb
@@ -49,3 +42,13 @@ deploy/*.env
 
 # Documentos personales del dueño del proyecto (tareas, entrega, datos de servidores). No se suben.
 para-mi/
+
+# No fundamental para el código (se generan o se guardan en local)
+# El video: voces, escenas animadas, guion y salidas
+video/
+# Capturas de pantalla: se regeneran con `npm run capturas`
+docs/capturas/
+*.mp4
+*.mov
+*.mp3
+*.wav

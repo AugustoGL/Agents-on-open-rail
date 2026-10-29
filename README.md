@@ -125,7 +125,7 @@ npm install
 npm test          # 145 pruebas: política, agente, configuración y bloqueos, panel, web, diseño (contraste AA), HTTP con x402 real (facilitador simulado), bot, cadena
 npm run e2e       # prueba en un navegador real (Chrome): reserva web, pago de prueba, cancelación y panel. Sin plata
 npm run seed      # (solo MODE=mock) carga reservas ficticias en todos los estados y decisiones variadas: `npm run seed -- --reset` para rehacerlas
-npm run capturas  # capturas de cada pantalla en celular y escritorio -> docs/capturas/
+npm run capturas  # capturas de cada pantalla en celular y escritorio -> docs/capturas/ (local, no se sube)
 npm run nft:clave # genera una clave de testnet para el NFT; después npm run nft:deploy y npm run nft:probar (ver GUIA, sección 14)
 npm run demo      # la historia completa en modo simulado, sin plata
 npm start         # servidor + bot (MODE=mock por defecto)
@@ -148,19 +148,10 @@ Para mainnet ver **[docs/GUIA.md](docs/GUIA.md)** (paso a paso en castellano).
 
 La **interfaz** (web de reservas, pago, panel, registro público y la guía de estilos), los **mensajes del agente** (motivos de cada decisión, avisos) y las **respuestas del bot de Telegram** están en **inglés**. El bot entiende mensajes en **español o inglés** ("¿hay cancha mañana a las 21?", "is there a court tomorrow at 9 pm?"). Estos documentos están en español. Los nombres de las canchas, el comercio y los motivos de bloqueo los escribe el comercio en el idioma que quiera.
 
-## Video
-
-`video/` tiene el explainer en formato short vertical (voz en inglés, subtítulos en inglés y español, paleta del panel). Las voces están en `video/elevenlabs/`, la animación en `video/render/` y las instrucciones de estilo en `video/INSTRUCCIONES-VIDEO.md`. Para regenerarlo hace falta `ffmpeg` (variable `FFMPEG=/ruta/ffmpeg` si no está en el PATH) y Chrome:
-
-```
-npm run video      # deja el mp4 en video/out/
-```
-
 ## Documentos
 
 - **[docs/GUIA.md](docs/GUIA.md)** — paso a paso para correrlo, llevarlo a mainnet y desplegar el NFT.
-- **[video/INSTRUCCIONES-VIDEO.md](video/INSTRUCCIONES-VIDEO.md)** — cómo está hecho el video y qué decir en cada escena.
 - **[docs/DEPLOY.md](docs/DEPLOY.md)** — cómo correrlo con Docker en un servidor (también compartido): límites, HTTPS, respaldo y restauración.
-- **`docs/capturas/`** — cada pantalla en celular y escritorio, claro y oscuro.
+- **Capturas** — `npm run capturas` guarda cada pantalla (celular y escritorio, claro y oscuro) en `docs/capturas/`; esa carpeta no se sube al repositorio.
 
 Licencia MIT.
