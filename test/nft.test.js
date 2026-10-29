@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createApp } from '../src/server.js';
-import { createSimulatedNft, tokenIdFor, ticketSvg, ticketMetadata, tokenUri, ARTEFACTO } from '../src/nft.js';
+import { createSimulatedNft, tokenIdFor, ticketSvg, ticketMetadata, tokenUri, ARTEFACTO, verificarTicket, leerTokenUri } from '../src/nft.js';
 import { loadConfig } from '../src/config.js';
 import { SenaAgent } from '../src/agent.js';
 import { createPaymentServer, MockFacilitator } from '../src/x402.js';
@@ -132,6 +132,87 @@ test('cuando se juega el turno, el ticket pasa a "jugada" y queda de recuerdo', 
   assert.equal(ctx.store.getBooking(booking.id).nft_state, 'used');
   assert.equal(ctx.agent.nftInfo(ctx.store.getBooking(booking.id)).estado, 'jugado');
   assert.ok(ctx.store.decisions({ bookingId: booking.id }).some((d) => d.rule === 'NFT_USADO'));
+});
+
+test('verificar: la reserva se relaciona con su ticket en la cadena en cada etapa (pago, jugado, cancelado)', async () => {
+  const ctx = conNft();
+  const jugada = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice }).booking;
+  const cancelada = ctx.agent.reserve({ resource: 'Court 2', startAt: WED_20, customer: bob }).booking;
+  await pagar(ctx, jugada);
+  await pagar(ctx, cancelada, PAYER_B);
+  // 1) Pagada: el ticket existe, es de quien pagó, es intransferible y dice "Confirmed".
+  let v = await verificarTicket(ctx.nft, jugada.id, { esperadoA: PAYER_A });
+  assert.equal(v.ok, true);
+  assert.equal(v.existe, true);
+  assert.equal(v.dueno, PAYER_A);
+  assert.equal(v.intransferible, true);
+  assert.equal(v.estado, 'Confirmed');
+  assert.equal(v.tokenId, String(tokenIdFor(jugada.id)));
+  assert.equal(await ctx.nft.balanceOf(PAYER_A), 1);
+  // 2) Otra billetera no es la dueña: se detecta.
+  v = await verificarTicket(ctx.nft, jugada.id, { esperadoA: PAYER_B });
+  assert.equal(v.ok, false);
+  assert.match(v.problema, /not the wallet that paid/);
+  // 3) Un ticket no puede hacerse pasar por otra reserva.
+  const id = String(tokenIdFor(jugada.id));
+  ctx.nft.tokens.get(id).uri = tokenUri(ticketMetadata({ negocio: 'x', recurso: 'y', cuando: 'z', inicioMs: 0, sena: '$ 1', codigo: 'S-OTRA99' }));
+  v = await verificarTicket(ctx.nft, jugada.id);
+  assert.equal(v.ok, false);
+  assert.match(v.problema, /names another booking/);
+  ctx.nft.tokens.get(id).uri = tokenUri(ticketMetadata({ negocio: 'x', recurso: 'Court 1', cuando: 'z', inicioMs: 0, sena: '$ 1', codigo: jugada.id }));
+  // 4) Cancelada: el ticket ya no existe.
+  await ctx.agent.cancel({ bookingId: cancelada.id, customerId: bob.id });
+  v = await verificarTicket(ctx.nft, cancelada.id, { esperadoA: PAYER_B });
+  assert.equal(v.ok, false);
+  assert.equal(v.existe, false);
+  assert.match(v.problema, /does not exist/);
+  // 5) Jugada: el ticket sigue siendo de la billetera y pasa a "Played".
+  ctx.clock.set(WED_20 + 3 * HOUR);
+  ctx.agent.completeFinished();
+  await ctx.agent.processNft();
+  v = await verificarTicket(ctx.nft, jugada.id, { esperadoA: PAYER_A });
+  assert.equal(v.ok, true);
+  assert.equal(v.estado, 'Played');
+});
+
+test('si el nodo todavía no ve el ticket recién emitido, no se da por quemado: espera, y si no aparece lo reintenta', async () => {
+  const antes = SenaAgent.NFT_ESPERA_MS; SenaAgent.NFT_ESPERA_MS = 0;
+  try {
+    // 1) El nodo se atrasa dos consultas: el ticket se quema igual.
+    let ctx = conNft();
+    let { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice });
+    await pagar(ctx, booking);
+    const real = ctx.nft.exists.bind(ctx.nft); let atraso = 2;
+    ctx.nft.exists = async (id) => (atraso-- > 0 ? false : real(id));
+    await ctx.agent.cancel({ bookingId: booking.id, customerId: alice.id });
+    assert.equal(ctx.nft.tokens.size, 0, 'el ticket tiene que haberse quemado a pesar del atraso');
+    assert.equal(ctx.store.getBooking(booking.id).nft_state, 'burned');
+    // 2) El nodo no lo ve nunca (en esta pasada): NO se marca como quemado, queda para reintentar.
+    ctx = conNft();
+    ({ booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice }));
+    await pagar(ctx, booking);
+    const real2 = ctx.nft.exists.bind(ctx.nft); let ciego = true;
+    ctx.nft.exists = async (id) => (ciego ? false : real2(id));
+    await ctx.agent.cancel({ bookingId: booking.id, customerId: alice.id });
+    let row = ctx.store.getBooking(booking.id);
+    assert.equal(ctx.nft.tokens.size, 1, 'el ticket sigue vivo: no se puede dar por quemado sin verlo');
+    assert.notEqual(row.nft_state, 'burned');
+    assert.equal(row.nft_action, 'burn');
+    assert.match(row.nft_error, /not visible on chain yet/);
+    // 3) Cuando el nodo se pone al día, el reintento lo quema.
+    ciego = false;
+    await ctx.agent.processNft();
+    assert.equal(ctx.nft.tokens.size, 0);
+    assert.equal(ctx.store.getBooking(booking.id).nft_state, 'burned');
+  } finally { SenaAgent.NFT_ESPERA_MS = antes; }
+});
+
+test('leerTokenUri decodifica el ticket y no se rompe con datos que no lo son', () => {
+  const m = ticketMetadata({ negocio: 'x', recurso: 'y', cuando: 'z', inicioMs: 0, sena: '$ 1', codigo: 'S-ABC123' });
+  assert.deepEqual(leerTokenUri(tokenUri(m)), m);
+  assert.equal(leerTokenUri('https://ejemplo.com/ticket.json'), null);
+  assert.equal(leerTokenUri('data:application/json;base64,@@@'), null);
+  assert.equal(leerTokenUri(undefined), null);
 });
 
 test('si la cadena falla, la reserva queda confirmada y el ticket se reintenta solo', async () => {

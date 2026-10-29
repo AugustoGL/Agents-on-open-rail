@@ -66,6 +66,58 @@ export function ticketMetadata({ negocio, recurso, cuando, inicioMs, sena, codig
 /** El contenido viaja dentro del contrato como un data: URI: la reserva se ve en la billetera sin ningún servidor. */
 export const tokenUri = (metadata) => `data:application/json;base64,${Buffer.from(JSON.stringify(metadata)).toString('base64')}`;
 
+/** Decodifica el data: URI del ticket (el inverso de tokenUri). Devuelve null si no es un ticket legible. */
+export function leerTokenUri(uri) {
+  try {
+    const m = /^data:application\/json;base64,(.+)$/.exec(String(uri));
+    return m ? JSON.parse(Buffer.from(m[1], 'base64').toString('utf8')) : null;
+  } catch { return null; }
+}
+
+/**
+ * Lector de la cadena: solo consultas, no necesita ninguna clave. Sirve para comprobar quién tiene un ticket y qué dice.
+ * El cliente real y el simulado ofrecen las mismas funciones (exists, ownerOf, tokenURI, locked, balanceOf).
+ */
+export function createNftReader({ contract, red = 'celoSepolia', rpcUrl }) {
+  const r = REDES_NFT[red];
+  if (!r) throw new Error(`Unknown NFT_CHAIN: ${red}. Use celoSepolia, sepolia or celo.`);
+  const address = getAddress(contract);
+  const abi = ARTEFACTO.abi;
+  const pub = createPublicClient({ chain: r.chain, transport: http(rpcUrl ?? r.chain.rpcUrls.default.http[0]) });
+  const leerFn = (functionName, args) => pub.readContract({ address, abi, functionName, args });
+  return {
+    red, redNombre: r.nombre, chainId: r.chain.id, testnet: r.testnet, contract: address, explorador: r.explorador,
+    urlToken: (tokenId) => r.token(r.explorador, address, tokenId),
+    urlTx: (tx) => `${r.explorador}/tx/${tx}`,
+    exists: (tokenId) => leerFn('exists', [BigInt(tokenId)]),
+    ownerOf: (tokenId) => leerFn('ownerOf', [BigInt(tokenId)]),
+    tokenURI: (tokenId) => leerFn('tokenURI', [BigInt(tokenId)]),
+    locked: (tokenId) => leerFn('locked', [BigInt(tokenId)]),
+    balanceOf: (holder) => leerFn('balanceOf', [getAddress(holder)]),
+  };
+}
+
+/**
+ * Relaciona una reserva con su ticket en la cadena y dice si coincide: el id del token sale del código de la reserva
+ * (tokenIdFor), así que no hace falta ninguna tabla aparte. `esperadoA` es la billetera que pagó (si se conoce).
+ * Es solo una verificación: NO reemplaza "Mis reservas con la billetera" (firma sin gas), que es lo que da acceso a la reserva.
+ */
+export async function verificarTicket(nft, codigoReserva, { esperadoA } = {}) {
+  const tokenId = tokenIdFor(codigoReserva);
+  const base = { reserva: codigoReserva, tokenId: String(tokenId), red: nft.redNombre, contrato: nft.contract, url: nft.urlToken(tokenId) };
+  if (!(await nft.exists(tokenId))) {
+    return { ...base, existe: false, ok: false, problema: 'The ticket does not exist on chain (it was never minted, or it was burned).' };
+  }
+  const [dueno, uri, bloqueado] = await Promise.all([nft.ownerOf(tokenId), nft.tokenURI(tokenId), nft.locked(tokenId).catch(() => null)]);
+  const meta = leerTokenUri(uri);
+  const estado = meta?.attributes?.find((a) => a.trait_type === 'Status')?.value ?? null;
+  const problemas = [];
+  if (!meta) problemas.push('The token has no readable ticket data.');
+  else if (!String(meta.name ?? '').includes(codigoReserva)) problemas.push(`The ticket data names another booking (${meta.name}).`);
+  if (esperadoA && getAddress(esperadoA) !== getAddress(dueno)) problemas.push(`The owner on chain (${dueno}) is not the wallet that paid (${getAddress(esperadoA)}).`);
+  return { ...base, existe: true, dueno: getAddress(dueno), intransferible: bloqueado, estado, nombre: meta?.name ?? null, ok: problemas.length === 0, ...(problemas.length ? { problema: problemas.join(' ') } : {}) };
+}
+
 const notSent = (err) => Object.assign(err, { notSent: true });
 
 /**
@@ -105,6 +157,10 @@ export function createNftClient({ contract, privateKey, red = 'celoSepolia', rpc
     urlToken: (tokenId) => r.token(r.explorador, address, tokenId),
     urlTx: (tx) => `${r.explorador}/tx/${tx}`,
     exists: (tokenId) => pub.readContract({ address, abi, functionName: 'exists', args: [BigInt(tokenId)] }),
+    ownerOf: (tokenId) => pub.readContract({ address, abi, functionName: 'ownerOf', args: [BigInt(tokenId)] }),
+    tokenURI: (tokenId) => pub.readContract({ address, abi, functionName: 'tokenURI', args: [BigInt(tokenId)] }),
+    locked: (tokenId) => pub.readContract({ address, abi, functionName: 'locked', args: [BigInt(tokenId)] }),
+    balanceOf: (holder) => pub.readContract({ address, abi, functionName: 'balanceOf', args: [getAddress(holder)] }),
     mint: ({ to, tokenId, uri }) => enviar('mint', [getAddress(to), BigInt(tokenId), uri]),
     setUri: (tokenId, uri) => enviar('setURI', [BigInt(tokenId), uri]),
     burn: (tokenId) => enviar('burn', [BigInt(tokenId)]),
@@ -129,6 +185,10 @@ export function createSimulatedNft({ red = 'celoSepolia', fallas = {} } = {}) {
     urlToken: (tokenId) => r.token(r.explorador, contract, tokenId),
     urlTx: (hash) => `${r.explorador}/tx/${hash}`,
     async exists(tokenId) { return tokens.has(String(tokenId)); },
+    async ownerOf(tokenId) { const t = tokens.get(String(tokenId)); if (!t) throw new Error('NoExiste'); return t.to; },
+    async tokenURI(tokenId) { const t = tokens.get(String(tokenId)); if (!t) throw new Error('NoExiste'); return t.uri; },
+    async locked() { return true; },
+    async balanceOf(holder) { return [...tokens.values()].filter((t) => t.to.toLowerCase() === String(holder).toLowerCase()).length; },
     async mint({ to, tokenId, uri }) { falla('mint'); if (bloqueados.has(String(tokenId))) throw notSent(new Error('The chain did not respond (simulated)')); if (tokens.has(String(tokenId))) throw notSent(new Error('YaExiste')); tokens.set(String(tokenId), { to: getAddress(to), uri }); llamadas.push(['mint', String(tokenId)]); return { hash: tx() }; },
     async setUri(tokenId, uri) { falla('setUri'); if (!tokens.has(String(tokenId))) throw notSent(new Error('NoExiste')); tokens.get(String(tokenId)).uri = uri; llamadas.push(['setUri', String(tokenId)]); return { hash: tx() }; },
     async burn(tokenId) { falla('burn'); if (!tokens.delete(String(tokenId))) throw notSent(new Error('NoExiste')); llamadas.push(['burn', String(tokenId)]); return { hash: tx() }; },

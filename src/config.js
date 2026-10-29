@@ -10,6 +10,13 @@ const env = (k, d = undefined) => {
   return v === undefined || v.trim() === '' ? d : v.trim();
 };
 
+// Valores de los archivos de ejemplo que nunca deben quedar en un servidor: si alguien copió el ejemplo y no lo editó, Seña no arranca.
+const EJEMPLOS = ['pone-una-clave-larga-que-solo-sepas-vos'];
+const noEjemplo = (nombre, valor) => {
+  if (valor && EJEMPLOS.includes(valor)) throw new Error(`${nombre} still has the example value from the .env example. Set your own long, unique password before starting.`);
+  return valor;
+};
+
 /**
  * Valores iniciales del negocio (config/negocio.json). Solo se usan para llenar la base la primera vez:
  * después la configuración vive en SQLite y se edita desde el panel.
@@ -61,7 +68,7 @@ export function loadConfig() {
     nftChain: env('NFT_CHAIN', 'celoSepolia'),
     nftRpcUrl: env('NFT_RPC_URL'),
     nftSimulado: env('NFT_SIMULADO', 'false') === 'true',
-    dashboardPassword: env('OWNER_DASHBOARD_PASSWORD'),
+    dashboardPassword: noEjemplo('OWNER_DASHBOARD_PASSWORD', env('OWNER_DASHBOARD_PASSWORD')),
     trustProxy: env('TRUST_PROXY', 'false') === 'true',
     erc8004AgentId: env('ERC8004_AGENT_ID'),
     repoUrl: env('REPO_URL', 'https://github.com/AugustoGL/Agents-on-open-rail'),

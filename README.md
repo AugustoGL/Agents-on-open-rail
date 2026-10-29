@@ -59,6 +59,8 @@ La billetera que pagó la seña es la dueña de la reserva. Hay dos formas de ve
 - **Sin duplicados:** el id sale del código de la reserva; emitir dos veces la misma falla en el contrato, así que reintentar es seguro.
 - **Sin servidor:** la imagen y los datos viajan dentro del contrato (`tokenURI`), así que se ven en la billetera aunque Seña esté apagada.
 - **Dónde:** Celo Sepolia (testnet) por defecto; `NFT_CHAIN=sepolia` o `celo`. En Celo mainnet cada ticket es una transacción del agente con su tag ERC-8021.
+- **Verificable por cualquiera, solo lectura:** `npm run nft:verificar -- --reserva S-XXXXXX` (y `--wallet 0x…`) relaciona la reserva con su ticket en la cadena: el id sale del código de la reserva, y el script comprueba que existe, de quién es, que es intransferible y qué estado muestra. No necesita ninguna clave.
+- **El ticket no da acceso a la reserva.** Es una credencial que se ve en la billetera. Para ver y cancelar reservas desde cualquier dispositivo se firma un mensaje ("See my bookings with my wallet"); eso no depende del NFT y sigue funcionando si el ticket falla o se quemó.
 - **Apagado por defecto:** sin `NFT_CONTRACT` no hay NFT; con `NFT_SIMULADO=true` (solo `MODE=mock`) se simula en memoria y la pantalla lo dice.
 - **Privacidad:** queda público en la cadena que una billetera reservó tal cancha a tal hora (sin nombres).
 
@@ -120,7 +122,7 @@ Requisitos: Node 22.5 o más nuevo.
 
 ```bash
 npm install
-npm test          # 139 pruebas: política, agente, configuración y bloqueos, panel, web, diseño (contraste AA), HTTP con x402 real (facilitador simulado), bot, cadena
+npm test          # 145 pruebas: política, agente, configuración y bloqueos, panel, web, diseño (contraste AA), HTTP con x402 real (facilitador simulado), bot, cadena
 npm run e2e       # prueba en un navegador real (Chrome): reserva web, pago de prueba, cancelación y panel. Sin plata
 npm run seed      # (solo MODE=mock) carga reservas ficticias en todos los estados y decisiones variadas: `npm run seed -- --reset` para rehacerlas
 npm run capturas  # capturas de cada pantalla en celular y escritorio -> docs/capturas/
@@ -157,10 +159,8 @@ npm run video      # deja el mp4 en video/out/
 ## Documentos
 
 - **[docs/GUIA.md](docs/GUIA.md)** — paso a paso para correrlo, llevarlo a mainnet y desplegar el NFT.
-- **[MIS-DEBERES.md](MIS-DEBERES.md)** — lo que solo puede hacer el dueño del proyecto (claves, plata, gente), en orden y con los comandos.
 - **[video/INSTRUCCIONES-VIDEO.md](video/INSTRUCCIONES-VIDEO.md)** — cómo está hecho el video y qué decir en cada escena.
-- **[ENTREGA](docs/ENTREGA.md)** — todo lo que hay que entregar: textos para el formulario, evidencia, guion del video y chequeo final.
-- **[docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md)** — cómo correrlo en un VPS compartido con Docker, con límites y respaldo diario.
+- **[docs/DEPLOY.md](docs/DEPLOY.md)** — cómo correrlo con Docker en un servidor (también compartido): límites, HTTPS, respaldo y restauración.
 - **`docs/capturas/`** — cada pantalla en celular y escritorio, claro y oscuro.
 
 Licencia MIT.

@@ -72,7 +72,7 @@ const evaluate = async (expression) => {
   return r.result.value;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function waitFor(expression, what, timeout = 8000) {
+async function waitFor(expression, what, timeout = 15000) {
   const t0 = Date.now();
   for (;;) {
     try { if (await evaluate(expression)) return; } catch { /* la página todavía carga */ }

@@ -46,3 +46,6 @@ video/out/
 
 # Variables de despliegue (claves)
 deploy/*.env
+
+# Documentos personales del dueño del proyecto (tareas, entrega, datos de servidores). No se suben.
+para-mi/

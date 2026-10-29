@@ -572,6 +572,8 @@ export class SenaAgent {
   // falla, la reserva sigue confirmada y el ticket se reintenta solo. Cancelar quema el ticket; jugar lo marca como jugado.
 
   static NFT_MAX_INTENTOS = 5;
+  static NFT_ESPERAS = 5; // veces que se vuelve a mirar si un ticket recién emitido ya se ve
+  static NFT_ESPERA_MS = 3000;
 
   /** Los datos del ticket tal como se ven en la billetera. */
   ticketDe(b, estado = b.status === 'completed' ? 'jugada' : 'confirmada') {
@@ -619,6 +621,21 @@ export class SenaAgent {
   }
 
   /** Hace lo que falte con los tickets: emitir, quemar o marcar como jugados. Nunca tira: los errores quedan anotados y se reintenta. */
+  /**
+   * ¿Existe el ticket? Los nodos públicos de RPC se atrasan unos segundos, así que un ticket que el agente acaba de emitir
+   * puede no verse todavía. Si lo emitimos nosotros (hay `nft_tx`) y no se ve, se espera un poco y, si sigue sin verse, se
+   * falla para que el reintento lo vuelva a mirar: dar por hecho "no hay nada que quemar" dejaría el ticket vivo en la billetera.
+   */
+  async ticketVisible(tokenId, booking) {
+    if (await this.nft.exists(tokenId)) return true;
+    if (!booking?.nft_tx) return false; // nunca lo emitimos: no hay nada que esperar
+    for (let i = 0; i < SenaAgent.NFT_ESPERAS; i++) {
+      await new Promise((r) => setTimeout(r, SenaAgent.NFT_ESPERA_MS));
+      if (await this.nft.exists(tokenId)) return true;
+    }
+    throw new Error('The ticket is not visible on chain yet (public RPC nodes can lag). It will be retried.');
+  }
+
   async processNft() {
     if (!this.nft) return 0;
     if (this._nftProcessing) return this._nftProcessing;
@@ -640,13 +657,13 @@ export class SenaAgent {
               await this.safeNotify(() => this.notifier.toCustomer(cur.customer_id, `🎟️ Your booking ${cur.id} is now in your wallet as an NFT.\n${this.nft.urlToken(tokenId)}`));
             }
           } else if (row.nft_action === 'burn') {
-            if (await this.nft.exists(tokenId)) {
+            if (await this.ticketVisible(tokenId, cur)) {
               const { hash } = await this.nft.burn(tokenId);
               this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_QUEMADO', reason: 'The booking was cancelled, so its NFT ticket was burned.', tx: hash });
             }
             this.store.updateBooking(row.id, { nft_state: 'burned', nft_action: null, nft_attempts: 0, nft_error: null }, hoy());
           } else if (row.nft_action === 'used') {
-            if (await this.nft.exists(tokenId)) {
+            if (await this.ticketVisible(tokenId, cur)) {
               const { hash } = await this.nft.setUri(tokenId, tokenUri(this.ticketDe(cur, 'jugada')));
               this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_USADO', reason: 'The slot was played: the NFT ticket changed to "played" and stays as a keepsake.', tx: hash });
             }

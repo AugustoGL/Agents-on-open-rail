@@ -29,7 +29,7 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   # Instancia REAL (mainnet). NO la corras en un servidor compartido con otro proyecto: lleva la clave privada del agente.
-  # Usá este mismo archivo en una máquina aparte (ver docs/DEPLOY-VPS.md, sección 10) y descomentala ahí.
+  # Usá este mismo archivo en una máquina aparte (ver docs/DEPLOY.md, sección 6) y descomentala ahí.
   # Usa otro archivo de variables, otra base y otro puerto, y sus claves no se mezclan con la demo.
   # sena-real:
   #   container_name: sena-real
