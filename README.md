@@ -160,6 +160,7 @@ npm run video      # deja el mp4 en video/out/
 - **[MIS-DEBERES.md](MIS-DEBERES.md)** — lo que solo puede hacer el dueño del proyecto (claves, plata, gente), en orden y con los comandos.
 - **[video/INSTRUCCIONES-VIDEO.md](video/INSTRUCCIONES-VIDEO.md)** — cómo está hecho el video y qué decir en cada escena.
 - **[ENTREGA](docs/ENTREGA.md)** — todo lo que hay que entregar: textos para el formulario, evidencia, guion del video y chequeo final.
+- **[docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md)** — cómo correrlo en un VPS compartido con Docker, con límites y respaldo diario.
 - **`docs/capturas/`** — cada pantalla en celular y escritorio, claro y oscuro.
 
 Licencia MIT.

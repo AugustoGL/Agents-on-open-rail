@@ -37,6 +37,7 @@ export function loadConfig() {
   const cfg = {
     mode,
     port: Number(env('PORT', '8402')),
+    host: env('HOST', '0.0.0.0'), // en un servidor compartido: 127.0.0.1 y publicar solo por el proxy con HTTPS
     publicBaseUrl: env('PUBLIC_BASE_URL', `http://localhost:${env('PORT', '8402')}`),
     dbPath: env('DB_PATH', mode === 'live' ? 'data/sena.db' : 'data/sena-demo.db'),
     agentPrivateKey: normalizePrivateKey(env('AGENT_PRIVATE_KEY')),

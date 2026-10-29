@@ -1,0 +1,14 @@
+.git
+.env
+.env.*
+!.env.example
+node_modules
+data
+docs
+video
+test
+scripts
+web
+*.md
+*.zip
+*.deb

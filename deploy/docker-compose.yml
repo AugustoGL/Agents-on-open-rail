@@ -1,0 +1,53 @@
+# Seña en un servidor compartido: límites duros para que NUNCA le quite recursos a otro proyecto.
+# Uso (desde la carpeta deploy/):  cp demo.env.example demo.env && chmod 600 demo.env && docker compose up -d --build
+name: sena
+services:
+  sena-demo:
+    container_name: sena-demo
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: sena-agent:local
+    restart: unless-stopped
+    env_file: ./demo.env
+    ports:
+      - "127.0.0.1:8402:8402"      # solo local: se publica por el proxy con HTTPS, nunca directo
+    volumes:
+      - sena-demo-data:/data       # la base SQLite vive acá y sobrevive a reinicios y actualizaciones
+    mem_limit: 300m
+    memswap_limit: 300m            # sin swap extra: si se pasa, se reinicia SOLO este contenedor
+    cpus: 0.5
+    pids_limit: 200
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # Instancia REAL (mainnet). NO la corras en un servidor compartido con otro proyecto: lleva la clave privada del agente.
+  # Usá este mismo archivo en una máquina aparte (ver docs/DEPLOY-VPS.md, sección 10) y descomentala ahí.
+  # Usa otro archivo de variables, otra base y otro puerto, y sus claves no se mezclan con la demo.
+  # sena-real:
+  #   container_name: sena-real
+  #   image: sena-agent:local
+  #   restart: unless-stopped
+  #   env_file: ./real.env
+  #   environment: { PORT: "8402", DB_PATH: /data/sena.db }
+  #   ports: ["127.0.0.1:8403:8402"]
+  #   volumes: [sena-real-data:/data]
+  #   mem_limit: 300m
+  #   memswap_limit: 300m
+  #   cpus: 0.5
+  #   pids_limit: 200
+  #   read_only: true
+  #   tmpfs: [/tmp]
+  #   cap_drop: [ALL]
+  #   security_opt: ["no-new-privileges:true"]
+
+volumes:
+  sena-demo-data:
+  # sena-real-data:

@@ -21,19 +21,19 @@ Lo que **solo vos podés hacer**: necesita tus claves, tu plata de prueba, tus c
 
 | Cuándo | Qué |
 |---|---|
-| **Hoy** | 0. Subir los cambios · 2. NFT en Sepolia · 3. Servidor fijo |
-| **Esta semana** | 4. Mainnet y primeros pagos con tag · 5. Probar con billetera real · 6. Telegram |
+| **Ya** | 0. Subir los cambios (la entrega apunta al repo) |
+| **Cerca de la fecha** (dejá margen: son varios días de trabajo) | 2. NFT en Sepolia · 3. Servidor: **3A demo en el VPS** y **3B instancia real aparte** · 4. Mainnet y primeros pagos con tag · 5. Probar con billetera real · 6. Telegram |
 | **Semana próxima** | 7. Uso real (comercio + compradores) · 8. Preguntas a Ripio/organizadores |
 | **Hasta el sábado 7** | 9. Actualizar la entrega con las pruebas reales |
 | **Domingo 8** | 10. Chequeo final y envío |
 
 ---
 
-## 0. Hoy: subir los cambios 🔴
+## 0. Ya: subir los cambios 🔴
 
 La entrega apunta a tu repo público, y ese repo todavía **no tiene** lo último (hay commits solo locales).
 
-- [ ] `git push` (el commit con la interfaz en inglés, el video y el orden del repo ya lo hice yo).
+- [ ] `git push`. El commit de la interfaz en inglés, el video y el orden del repo ya está hecho; **los archivos de despliegue** (`Dockerfile`, `deploy/`, `docs/DEPLOY-VPS.md` y la variable `HOST`) **todavía no están commiteados**: pedime el commit antes de subir.
 - [ ] Verificá que se ve: `curl -s https://raw.githubusercontent.com/AugustoGL/Agents-on-open-rail/main/agent.json`
 - [ ] Revisá que no haya secretos en el historial: `git log -p | grep -iE "private|secret|api_key"` (no debería salir ninguna clave).
 - [ ] **Reiniciá el servidor de la demo pública** (ngrok): sigue sirviendo la versión anterior, en español, y es lo que va a abrir el jurado.
@@ -43,7 +43,7 @@ La entrega apunta a tu repo público, y ese repo todavía **no tiene** lo últim
 
 ## 1. Cosas del repo que ya hice
 
-El repo está ordenado: guías en `docs/`, salidas del video fuera de git (`video/out/`), nada sensible. No tenés que hacer nada acá.
+El repo está ordenado: guías en `docs/`, salidas del video fuera de git (`video/out/`), nada sensible, y el despliegue con Docker (`Dockerfile`, `deploy/`) ya probado. No tenés que hacer nada acá.
 
 ## 2. NFT en Celo Sepolia (≈ 10 minutos)
 
@@ -62,18 +62,42 @@ El contrato está compilado y probado en una EVM local. Falta desplegarlo con **
 
 ## 3. Servidor fijo 🔴
 
-El link de ngrok cambia y depende de tu PC prendida. El jurado va a probar la app durante varios días.
+El link de ngrok cambia y depende de tu PC prendida; el jurado va a probar la app durante varios días. **Todo el procedimiento, probado, está en `docs/DEPLOY-VPS.md`** (ya están hechos el `Dockerfile`, `deploy/docker-compose.yml` y `deploy/backup.sh`). Dividido en dos, porque **la clave con plata de verdad no puede vivir en el servidor que comparte Kronos**:
 
-- [ ] Elegí dónde correrlo (cualquier servidor con Node 22.5+): una VPS chica, Fly.io, Railway, Render…
-- [ ] Variables de entorno mínimas: `MODE`, `PORT`, `PUBLIC_BASE_URL` (la URL https final), `TRUST_PROXY=true`, `OWNER_DASHBOARD_PASSWORD`, `DB_PATH`.
-- [ ] La base SQLite (`data/*.db`) tiene que estar en un **disco que persista** y con **respaldo** (copia diaria del archivo).
-- [ ] Que se reinicie solo si se cae (systemd, el reinicio de la plataforma o `pm2`).
-- [ ] HTTPS obligatorio (las billeteras y los pagos lo piden).
-- [ ] **Decidí qué ve el jurado** (ver "Decisiones abiertas"): una instancia en MODO PRUEBA, una real con montos chicos, o las dos con dos URLs.
-- [ ] Cambiá la clave del panel de la demo pública (la de ngrok es de prueba y está en tu terminal).
-- [ ] Apagá el ngrok cuando tengas el servidor fijo (`pkill ngrok`).
+| | Dónde | Lleva claves de billetera |
+|---|---|---|
+| **3A. Demo** (MODO PRUEBA) | Tu VPS de DattaWeb (Docker, 2 CPU / 2 GB), con límites para no afectar a Kronos | **Ninguna** (solo la clave del panel) |
+| **3B. Instancia real** (mainnet) | **Otra máquina**, aislada (ver "Decisiones abiertas") | **Sí**, la del agente |
+
+### 3A. Demo en el VPS (≈ 1 a 2 horas, la primera vez)
+
+- [ ] **Diagnóstico de solo lectura** (guía, sección 1): conectate con `ssh -p5082 root@149.50.153.224`, corré los comandos y **pasame la salida sin contraseñas**. Con eso adapto el proxy a cómo esté armado Kronos. **No toques nada antes.**
+- [ ] **Dirección:** elegí (guía, sección 2): **A. HTTPS directo sobre la IP** (`https://149.50.153.224`, gratis y sin registrarte; certificado de 6 días con renovación automática) o **B. nombre gratis de DuckDNS** (`sena.duckdns.org`). No uses `http://IP:puerto`.
+- [ ] Traer el código: `git clone` en `/opt/sena` (el repo ya es público).
+- [ ] `deploy/demo.env`: `MODE=mock`, `PUBLIC_BASE_URL=<la dirección elegida>`, `TRUST_PROXY=true`, `OWNER_DASHBOARD_PASSWORD=<clave larga nueva>`, `NFT_SIMULADO=true`. Permisos `chmod 600`.
+- [ ] `nice -n 19 docker compose up -d --build` (desde `deploy/`). Tiene que decir **healthy**; fijate con `docker stats` que Kronos siga igual.
+- [ ] **Antes de tocar la configuración del proxy, copiala** (`cp -a /etc/nginx /root/nginx-copia`) y **probá la sintaxis** (`nginx -t`) **antes de recargar**. Un error recargado a ciegas puede tumbar los sitios de Kronos.
+- [ ] Publicarlo por HTTPS (guía, sección 2 o 5, según el diagnóstico). Si usás la **IP**: Certbot 5.4 o más, primero `--staging`, y el `--deploy-hook` para recargar nginx.
+- [ ] **Renovación del certificado de IP (cada 6 días):** `certbot renew --dry-run` sin errores y el temporizador activo (`systemctl list-timers | grep -i certbot`). Si falla, a los 6 días el sitio muestra un error de certificado.
+- [ ] Verificar: carga con candado, dice **TEST MODE**, se puede reservar y "Pay as a test", `/panel` pide la clave, `/decisiones` anda.
+- [ ] Sembrar la demo con datos de ejemplo (`npm run seed -- --reset` en tu PC y copiar la base, o reservar a mano algunas para que `/decisiones` no esté vacío).
+- [ ] **Respaldo diario:** `crontab` con `deploy/backup.sh` (guía, sección 7) y probarlo una vez a mano. **Bajate una copia a tu PC** de vez en cuando (`scp -P 5082 …`).
+- [ ] **Endurecer el SSH del VPS** (hoy es `root` con contraseña): entrar con **clave SSH** y desactivar el ingreso por contraseña. Hacelo con la sesión actual abierta, para no quedarte afuera.
+- [ ] Cambiá la clave del panel de la demo vieja y apagá el ngrok cuando la nueva ande (`pkill ngrok`). Cargá la URL nueva en la entrega.
+- [ ] Revisá **un día después** que siga andando (`docker compose ps`, el certificado, el respaldo).
+
+### 3B. Instancia real, en una máquina aparte (después del punto 4)
+
+- [ ] **Decidí dónde** (ver "Decisiones abiertas"): VM gratis de Oracle, Fly.io (~US$2,34 al mes) o tu PC por pocos días.
+- [ ] Usá el mismo `Dockerfile` y `docker-compose.yml`, descomentando `sena-real`, con su propio `real.env` (`MODE=live`, `AGENT_PRIVATE_KEY`, `X402_API_KEY`, `OWNER_PAYOUT_ADDRESS`, `ATTRIBUTION_TAG`…) con permisos `600`.
+- [ ] **Billetera solo para el agente, con saldo chico.** `OWNER_PAYOUT_ADDRESS` = tu billetera personal (nunca la del agente), para que lo acumulado salga cada noche.
+- [ ] Si usás **Oracle**: guardá un respaldo diario fuera de la VM (Oracle puede recuperar máquinas "inactivas") y tené a mano el script para recrearla.
+- [ ] HTTPS y respaldo, igual que en 3A.
+- [ ] **Nunca pegues claves** en chats, capturas ni commits. Si algo se filtra: sacá el saldo, generá una clave nueva y volvé a registrar la identidad.
 
 ## 4. Mainnet y primeros pagos con tag 🔴
+
+> La clave del agente real (`AGENT_PRIVATE_KEY`) **no va en el VPS compartido con Kronos**. Mientras hacés estas pruebas, corré la instancia real en tu PC; después pasala a la máquina aparte (punto 3B).
 
 Seguí la GUIA, pasos 6 a 10. Nada de esto lo probé yo: necesita tus claves y plata real.
 
@@ -168,11 +192,15 @@ Está todo en **`docs/ENTREGA.md`**, sección 9: textos, evidencia (hashes, comp
 ## Decisiones abiertas (las tomás vos)
 
 1. **¿Qué prueba el jurado?** (a) solo la demo en MODO PRUEBA (cero riesgo, sin plata); (b) una instancia real con montos chicos (más creíble, más riesgo); (c) las dos, con dos URLs. **Recomiendo (c)**: la demo para recorrer todo sin plata y la real para los hashes y los usuarios.
-2. **NFT en mainnet o solo en Sepolia.** Mainnet suma transacciones con tag pero cuesta gas real y obliga a usar la clave del agente. Sepolia es gratis y no suma puntos.
-3. **Privacidad del ticket.** Hoy queda público en la cadena que una billetera reservó tal cancha a tal hora. Si te preocupa, dejá el NFT apagado en la instancia real y activo solo en la demo.
-4. **Comercio de demostración o real.** Mientras no haya un comercio real, mantené el cartel "comercio de demostración".
+2. **¿Dónde corre la instancia real?** (la clave con plata no va en el VPS de Kronos): **Oracle gratis** (aislada, $0, pero puede recuperar la VM por inactividad y hay que respaldar), **Fly.io** (~US$2,34 al mes, la opción más confiable) o **tu PC** (cero costo, pero se cae si apagás la compu). **Recomiendo Fly.io** para la real y el VPS para la demo.
+3. **NFT en mainnet o solo en Sepolia.** Mainnet suma transacciones con tag pero cuesta gas real y obliga a usar la clave del agente. Sepolia es gratis y no suma puntos.
+4. **Privacidad del ticket.** Hoy queda público en la cadena que una billetera reservó tal cancha a tal hora. Si te preocupa, dejá el NFT apagado en la instancia real y activo solo en la demo.
+5. **Comercio de demostración o real.** Mientras no haya un comercio real, mantené el cartel "comercio de demostración".
 
 ## Cosas para no olvidar
+
+- **Dejá margen:** el despliegue (3A y 3B), mainnet y las pruebas con gente no se hacen en una tarde. Empezá con tiempo; lo único que no se puede recuperar es la fecha.
+- **Kronos primero:** nada de lo que hagas en el VPS puede tumbar el otro proyecto. Copiá antes de editar, probá antes de recargar y mirá `docker stats` y `free -h` después.
 
 - Las claves (`AGENT_PRIVATE_KEY`, `NFT_PRIVATE_KEY`, `X402_API_KEY`, el token de Telegram) **solo en el `.env`** y nunca en chats, capturas ni commits.
 - La clave del agente real y la del NFT de testnet **son distintas**, salvo que despliegues el NFT en mainnet a propósito.

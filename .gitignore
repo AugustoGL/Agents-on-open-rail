@@ -43,3 +43,6 @@ video/out/
 # Instaladores y paquetes sueltos
 *.deb
 *.zip
+
+# Variables de despliegue (claves)
+deploy/*.env

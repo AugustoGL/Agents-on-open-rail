@@ -57,8 +57,8 @@ async function main() {
     agent, payments, logger, registration: { agentId: cfg.erc8004AgentId, repoUrl: cfg.repoUrl },
     dashboardPassword: cfg.dashboardPassword, trustProxy: cfg.trustProxy,
   });
-  const server = app.listen(cfg.port, () => {
-    logger.info(`Seña escuchando en ${cfg.publicBaseUrl} (puerto ${cfg.port}) · modo ${cfg.mode} · wallet ${chain.address}`);
+  const server = app.listen(cfg.port, cfg.host, () => {
+    logger.info(`Seña escuchando en ${cfg.publicBaseUrl} (${cfg.host}:${cfg.port}) · modo ${cfg.mode} · wallet ${chain.address}`);
     logger.info(`Negocio: ${agent.business.nombre} · seña ${formatArs(agent.depositWei())} · cobra en ${cfg.payTo ?? chain.address}`);
     logger.info(nft ? `Ticket NFT: ${nft.redNombre}${nft.simulated ? '' : ` · contrato ${nft.contract}`}` : 'Ticket NFT: apagado (ver NFT_CONTRACT en .env.example).');
     logger.info(cfg.dashboardPassword ? `Panel del comercio: ${cfg.publicBaseUrl}/panel` : 'Panel del comercio deshabilitado: falta OWNER_DASHBOARD_PASSWORD en .env.');
