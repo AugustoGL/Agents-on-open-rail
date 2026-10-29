@@ -73,7 +73,7 @@ test('/api/decisiones trae datos legibles y nada personal', async () => {
   assert.equal(typeof tarde.datos.horasAntes, 'number');
   assert.ok(tarde.datos.horasAntes < 6);
   const cobro = decisiones.find((d) => d.regla === 'SENA_COBRADA');
-  assert.equal(cobro.datos.monto, '$ 6.000');
+  assert.equal(cobro.datos.monto, '$ 6,000');
   assert.ok(decisiones.every((d) => typeof d.datos === 'object'));
   const cancelaPorComercio = decisiones.find((d) => d.regla === 'CANCELADO_POR_COMERCIO');
   assert.equal(cancelaPorComercio.datos.cancelaElComercio, true);
@@ -92,7 +92,7 @@ test('cada regla que emite el agente tiene título y explicación en el registro
 });
 
 test('el panel y el registro público usan el sistema de diseño', async () => {
-  for (const [path, re] of [['/decisiones', /Qué decide el agente/], ['/panel', /Panel del comercio/]]) {
+  for (const [path, re] of [['/decisiones', /What the agent decides/], ['/panel', /Venue dashboard/]]) {
     const html = await (await fetch(base + path)).text();
     assert.match(html, re);
     assert.match(html, /\/static\/css\/sena\.css/);

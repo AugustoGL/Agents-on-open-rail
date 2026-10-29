@@ -17,9 +17,9 @@ test('pesos <-> wARS con 18 decimales', () => {
   assert.throws(() => arsToWei('abc'));
 });
 
-test('formato argentino', () => {
-  assert.equal(formatArs(arsToWei(6000)), '$ 6.000');
-  assert.equal(formatArs(arsToWei('1234567.5')), '$ 1.234.567,50');
+test('US money format', () => {
+  assert.equal(formatArs(arsToWei(6000)), '$ 6,000');
+  assert.equal(formatArs(arsToWei('1234567.5')), '$ 1,234,567.50');
   assert.equal(formatArs(0n), '$ 0');
 });
 
@@ -36,7 +36,7 @@ test('la seña es el 25% del turno', () => {
 test('horas locales de Córdoba (UTC-3)', () => {
   const ms = localToUtcMs('2026-10-22', '21:30', -180);
   assert.equal(new Date(ms).toISOString(), '2026-10-23T00:30:00.000Z');
-  assert.equal(formatLocal(ms, -180), 'jue 22/10 21:30');
+  assert.equal(formatLocal(ms, -180), 'Thu 22/10 21:30');
   assert.equal(localDateStr(ms, -180), '2026-10-22');
   assert.equal(addDays('2026-10-31', 1), '2026-11-01');
 });

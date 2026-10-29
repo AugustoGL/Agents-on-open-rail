@@ -60,7 +60,7 @@ export class SenaAgent {
   }
 
   async safeNotify(fn) {
-    try { await fn(); } catch (err) { this.logger.warn?.(`[aviso] no se pudo notificar: ${err.message}`); }
+    try { await fn(); } catch (err) { this.logger.warn?.(`[notice] could not notify: ${err.message}`); }
   }
 
   // --- Turnos -------------------------------------------------------------
@@ -69,17 +69,17 @@ export class SenaAgent {
   validateSlot(resource, startAt) {
     const b = this.business;
     if (!b.recursos.includes(resource)) {
-      return { ok: false, reason: b.recursosTodos.includes(resource) ? `"${resource}" no está disponible por ahora.` : `No existe "${resource}".` };
+      return { ok: false, reason: b.recursosTodos.includes(resource) ? `"${resource}" is not available right now.` : `No existe "${resource}".` };
     }
     const date = localDateStr(startAt, this.offset);
     const valid = hoursFor(b, resource, weekdayOf(date)).some((h) => localToUtcMs(date, h, this.offset) === startAt);
-    if (!valid) return { ok: false, reason: 'Ese horario no está en la grilla de turnos.' };
+    if (!valid) return { ok: false, reason: 'That time is not in the slot grid.' };
     const now = this.now();
     if (startAt < now + b.anticipacionMinimaMinutos * MINUTE) {
-      return { ok: false, reason: `Hay que reservar con al menos ${b.anticipacionMinimaMinutos} minutos de anticipación.` };
+      return { ok: false, reason: `You must book at least ${b.anticipacionMinimaMinutos} minutes ahead.` };
     }
     if (startAt > now + b.diasAdelante * 24 * 60 * MINUTE) {
-      return { ok: false, reason: `Solo se puede reservar hasta ${b.diasAdelante} días adelante.` };
+      return { ok: false, reason: `You can only book up to ${b.diasAdelante} days ahead.` };
     }
     return { ok: true };
   }
@@ -134,13 +134,13 @@ export class SenaAgent {
 
   describe(b) {
     const estados = {
-      held: `reservada, falta pagar la seña (vence ${this.fmt(b.hold_expires_at)})`,
-      confirmed: 'confirmada',
-      cancelled: 'cancelada',
-      expired: 'vencida sin pago',
-      completed: 'jugada',
+      held: `booked, deposit still to pay (expires ${this.fmt(b.hold_expires_at)})`,
+      confirmed: 'confirmed',
+      cancelled: 'cancelled',
+      expired: 'expired unpaid',
+      completed: 'played',
     };
-    return `${b.id} · ${this.fmt(b.start_at)} · ${b.resource} · seña ${formatArs(b.deposit_wei)} · ${estados[b.status] ?? b.status}`;
+    return `${b.id} · ${this.fmt(b.start_at)} · ${b.resource} · deposit ${formatArs(b.deposit_wei)} · ${estados[b.status] ?? b.status}`;
   }
 
   // --- Reservar -------------------------------------------------------------
@@ -160,16 +160,16 @@ export class SenaAgent {
     const v = this.validateSlot(resource, startAt);
     if (!v.ok) return { ok: false, code: 'turno_invalido', reason: v.reason };
     const blocked = this.blockFor(resource, startAt);
-    if (blocked) return { ok: false, code: 'bloqueado', reason: `Ese turno no está disponible (${blocked.reason}).` };
+    if (blocked) return { ok: false, code: 'bloqueado', reason: `That slot is not available (${blocked.reason}).` };
     this.ensureCustomer(customer);
 
     const now = this.now();
     const holds = this.store.bookingsForCustomer(customer.id, { onlyUpcomingFrom: now }).filter((b) => b.status === 'held');
     if (holds.length >= MAX_HOLDS_PER_CUSTOMER) {
-      return { ok: false, code: 'muchas_reservas', reason: `Ya tenés ${holds.length} reservas sin pagar. Pagá o cancelá alguna antes de reservar otra.` };
+      return { ok: false, code: 'muchas_reservas', reason: `You already have ${holds.length} unpaid bookings. Pay or cancel one before booking another.` };
     }
     if (this.store.activeBookingForSlot(resource, startAt)) {
-      return { ok: false, code: 'ocupado', reason: 'Ese turno ya está tomado. Podés anotarte en la lista de espera.' };
+      return { ok: false, code: 'ocupado', reason: 'That slot is already taken. You can join the waitlist.' };
     }
     const minutes = holdMinutes ?? this.business.reservaSinPagarMinutos;
     let booking;
@@ -182,13 +182,13 @@ export class SenaAgent {
         });
       } catch (err) {
         if (/bookings\.id/.test(err.message) && attempt < 3) continue; // choque de id: probar otro
-        if (/UNIQUE/i.test(err.message)) return { ok: false, code: 'ocupado', reason: 'Ese turno se acaba de tomar. Podés anotarte en la lista de espera.' };
+        if (/UNIQUE/i.test(err.message)) return { ok: false, code: 'ocupado', reason: 'That slot was just taken. You can join the waitlist.' };
         throw err;
       }
     }
     this.log({
       booking_id: booking.id, kind: 'reserva', rule: source === 'lista_espera' ? 'OFERTA_LISTA_ESPERA' : 'TURNO_LIBRE',
-      reason: `Turno libre: ${resource}, ${this.fmt(startAt)}. Se reserva ${minutes} min para pagar la seña de ${formatArs(booking.deposit_wei)}.`,
+      reason: `Free slot: ${resource}, ${this.fmt(startAt)}. It is held for ${minutes} min to pay the deposit of ${formatArs(booking.deposit_wei)}.`,
       data: { customer: customer.id, channel: customer.channel },
     });
     return { ok: true, booking };
@@ -212,11 +212,11 @@ export class SenaAgent {
   /** ¿Se puede pagar esta reserva ahora? Lo usa el servidor antes y durante el cobro x402. */
   checkPayable(bookingId) {
     const b = this.store.getBooking(bookingId);
-    if (!b) return { ok: false, status: 404, code: 'no_existe', reason: 'No existe esa reserva.' };
-    if (b.status === 'confirmed') return { ok: false, status: 409, code: 'ya_pagada', reason: 'Esa reserva ya está pagada.', booking: b };
-    if (b.status === 'expired') return { ok: false, status: 410, code: 'vencida', reason: 'Se venció el tiempo para pagar la seña. Reservá de nuevo.', booking: b };
-    if (b.status !== 'held') return { ok: false, status: 410, code: 'no_disponible', reason: 'La reserva ya no está activa.', booking: b };
-    if (b.hold_expires_at <= this.now()) return { ok: false, status: 410, code: 'vencida', reason: 'Se venció el tiempo para pagar la seña.', booking: b };
+    if (!b) return { ok: false, status: 404, code: 'no_existe', reason: 'That booking does not exist.' };
+    if (b.status === 'confirmed') return { ok: false, status: 409, code: 'ya_pagada', reason: 'That booking is already paid.', booking: b };
+    if (b.status === 'expired') return { ok: false, status: 410, code: 'vencida', reason: 'The time to pay the deposit has run out. Book again.', booking: b };
+    if (b.status !== 'held') return { ok: false, status: 410, code: 'no_disponible', reason: 'The booking is no longer active.', booking: b };
+    if (b.hold_expires_at <= this.now()) return { ok: false, status: 410, code: 'vencida', reason: 'The time to pay the deposit has run out.', booking: b };
     return { ok: true, booking: b };
   }
 
@@ -252,7 +252,7 @@ export class SenaAgent {
         }, now);
         this.log({
           booking_id: b.id, kind: 'cobro', rule: b.status === 'expired' ? 'PAGO_TARDIO_ACEPTADO' : 'SENA_COBRADA',
-          reason: `Seña de ${formatArs(amount)} cobrada en wARS. Turno confirmado.` + (b.status === 'expired' ? ' Llegó después del vencimiento pero el turno seguía libre.' : ''),
+          reason: `Deposit of ${formatArs(amount)} collected in wARS. Slot confirmed.` + (b.status === 'expired' ? ' It arrived after the expiry but the slot was still free.' : ''),
           data: { payer }, tx,
         });
         if (b.source === 'lista_espera') {
@@ -262,11 +262,11 @@ export class SenaAgent {
         return { kind: 'confirmado', booking };
       }
       // Pago que no corresponde a una reserva pagable: se devuelve completo.
-      const reason = !b ? 'El pago no corresponde a ninguna reserva.'
-        : amount !== BigInt(b.deposit_wei) ? `El monto pagado (${formatArs(amount)}) no coincide con la seña (${formatArs(b.deposit_wei)}).`
-          : b.status === 'confirmed' ? 'La reserva ya estaba pagada (pago duplicado).'
-            : 'La reserva ya no estaba disponible cuando llegó el pago.';
-      this.log({ booking_id: b?.id ?? null, kind: 'cobro', rule: 'PAGO_A_DEVOLVER', reason: `${reason} Se devuelve todo.`, data: { payer, amountWei: amount }, tx });
+      const reason = !b ? 'The payment does not match any booking.'
+        : amount !== BigInt(b.deposit_wei) ? `The amount paid (${formatArs(amount)}) does not match the deposit (${formatArs(b.deposit_wei)}).`
+          : b.status === 'confirmed' ? 'The booking was already paid (duplicate payment).'
+            : 'The booking was no longer available when the payment arrived.';
+      this.log({ booking_id: b?.id ?? null, kind: 'cobro', rule: 'PAGO_A_DEVOLVER', reason: `${reason} Everything is refunded.`, data: { payer, amountWei: amount }, tx });
       return { kind: 'devolver', booking: b, reason };
     });
 
@@ -275,14 +275,14 @@ export class SenaAgent {
       this.queueResaleRefunds(b);
       this.queueNftMint(b);
       await this.safeNotify(() => this.notifier.toCustomer(b.customer_id,
-        `✅ Listo, tu turno quedó confirmado.\n${this.describe(b)}\nSi necesitás cancelar, usá /cancelar ${b.id}.`, { booking: b }));
-      await this.safeNotify(() => this.notifier.toOwner(`💰 Seña cobrada: ${this.describe(b)}\nTx: ${tx}`));
+        `✅ Done, your slot is confirmed.\n${this.describe(b)}\nIf you need to cancel, use /cancelar ${b.id}.`, { booking: b }));
+      await this.safeNotify(() => this.notifier.toOwner(`💰 Deposit collected: ${this.describe(b)}\nTx: ${tx}`));
     } else if (result.kind === 'devolver') {
       this.queueTransfer({
         kind: 'refund', booking: result.booking, to: payer, amountWei: amount,
         idemKey: `refund:payment:${tx}`, note: result.reason, rule: 'PAGO_A_DEVOLVER',
       });
-      await this.safeNotify(() => this.notifier.toOwner(`↩️ Pago que no correspondía (${result.reason}). Se devuelve ${formatArs(amount)} a ${payer}.`));
+      await this.safeNotify(() => this.notifier.toOwner(`↩️ Payment that did not belong (${result.reason}). ${formatArs(amount)} is refunded to ${payer}.`));
     }
     await this.processTransfers();
     await this.processNft();
@@ -294,13 +294,13 @@ export class SenaAgent {
   /** Qué pasaría si se cancela ahora, sin cancelar nada (para pedir confirmación). */
   previewCancel({ bookingId, customerId, fullRefund = false }) {
     const b = this.store.getBooking(bookingId);
-    if (!b) return { ok: false, reason: 'No existe esa reserva.' };
-    if (customerId && b.customer_id !== customerId) return { ok: false, reason: 'Esa reserva no es tuya.' };
-    if (b.status === 'held') return { ok: true, booking: b, refundWei: 0n, rule: 'SIN_PAGO', reason: 'Todavía no pagaste la seña, así que se cancela sin costo.' };
-    if (b.status !== 'confirmed') return { ok: false, reason: 'Esa reserva ya no está activa.' };
+    if (!b) return { ok: false, reason: 'That booking does not exist.' };
+    if (customerId && b.customer_id !== customerId) return { ok: false, reason: 'That booking is not yours.' };
+    if (b.status === 'held') return { ok: true, booking: b, refundWei: 0n, rule: 'SIN_PAGO', reason: 'You have not paid the deposit yet, so it is cancelled at no cost.' };
+    if (b.status !== 'confirmed') return { ok: false, reason: 'That booking is no longer active.' };
     if (fullRefund) {
       const remaining = BigInt(b.deposit_wei) - BigInt(b.refunded_wei);
-      return { ok: true, booking: b, refundWei: remaining, rule: 'CANCELADO_POR_COMERCIO', reason: `Cancela el comercio: se devuelve toda la seña (${formatArs(remaining)}).` };
+      return { ok: true, booking: b, refundWei: remaining, rule: 'CANCELADO_POR_COMERCIO', reason: `The venue cancels: the whole deposit is refunded (${formatArs(remaining)}).` };
     }
     const d = decideCancellation({ startAt: b.start_at, now: this.now(), paidWei: b.deposit_wei, policy: this.policyOf(b) });
     if (d.rule === 'TURNO_EMPEZADO') return { ok: false, reason: d.reason };
@@ -315,18 +315,18 @@ export class SenaAgent {
   async cancel({ bookingId, customerId, by = 'customer', fullRefund = false, reason = null }) {
     const now = this.now();
     const b = this.store.getBooking(bookingId);
-    if (!b) return { ok: false, reason: 'No existe esa reserva.' };
-    if (by === 'customer' && b.customer_id !== customerId) return { ok: false, reason: 'Esa reserva no es tuya.' };
+    if (!b) return { ok: false, reason: 'That booking does not exist.' };
+    if (by === 'customer' && b.customer_id !== customerId) return { ok: false, reason: 'That booking is not yours.' };
     const because = reason ? ` (${reason})` : '';
     const notifyOwnerCancel = () => (by === 'owner'
-      ? this.safeNotify(() => this.notifier.toCustomer(b.customer_id, `❌ El comercio canceló tu turno ${b.id} · ${this.fmt(b.start_at)} · ${b.resource}${because}.`))
+      ? this.safeNotify(() => this.notifier.toCustomer(b.customer_id, `❌ The venue cancelled your slot ${b.id} · ${this.fmt(b.start_at)} · ${b.resource}${because}.`))
       : undefined);
 
     if (b.status === 'held') {
       this.store.updateBooking(b.id, { status: 'cancelled', cancel_rule: 'SIN_PAGO', hold_expires_at: null }, now);
       this.log({
         booking_id: b.id, kind: 'cancelacion', rule: 'SIN_PAGO',
-        reason: by === 'owner' ? `El comercio canceló la reserva antes de que se pagara la seña${because}. No hay plata que devolver.` : 'Se canceló antes de pagar la seña. No hay plata que devolver.',
+        reason: by === 'owner' ? `The venue cancelled the booking before the deposit was paid${because}. There is no money to refund.` : 'Cancelled before the deposit was paid. There is no money to refund.',
       });
       if (b.source === 'lista_espera') {
         const w = this.store.waitlistByOfferedBooking(b.id);
@@ -334,16 +334,16 @@ export class SenaAgent {
       }
       await notifyOwnerCancel();
       await this.offerSlot(b.resource, b.start_at);
-      return { ok: true, refundWei: 0n, rule: 'SIN_PAGO', reason: 'Reserva cancelada. No habías pagado nada.' };
+      return { ok: true, refundWei: 0n, rule: 'SIN_PAGO', reason: 'Booking cancelled. You had not paid anything.' };
     }
-    if (b.status !== 'confirmed') return { ok: false, reason: `La reserva ya está ${b.status === 'cancelled' ? 'cancelada' : 'cerrada'}.` };
+    if (b.status !== 'confirmed') return { ok: false, reason: `The booking is already ${b.status === 'cancelled' ? 'cancelled' : 'closed'}.` };
 
     let d;
     if (fullRefund) {
       const remaining = BigInt(b.deposit_wei) - BigInt(b.refunded_wei);
       d = {
         refundWei: remaining, rule: 'CANCELADO_POR_COMERCIO', hoursBefore: (b.start_at - now) / 3_600_000, offerToWaitlist: false,
-        reason: `El comercio canceló el turno${because}. Se devuelve toda la seña: ${formatArs(remaining)}.`,
+        reason: `The venue cancelled the slot${because}. The whole deposit is refunded: ${formatArs(remaining)}.`,
       };
     } else {
       d = decideCancellation({ startAt: b.start_at, now, paidWei: b.deposit_wei, policy: this.policyOf(b) });
@@ -364,7 +364,7 @@ export class SenaAgent {
         idemKey: `refund:${b.id}:cancelacion`, note: d.reason, rule: d.rule,
       });
     }
-    await this.safeNotify(() => this.notifier.toOwner(`❌ Cancelación ${b.id} (${d.rule}): ${d.reason}`));
+    await this.safeNotify(() => this.notifier.toOwner(`❌ Cancellation ${b.id} (${d.rule}): ${d.reason}`));
     await notifyOwnerCancel();
     this.queueNftBurn(b);
     if (d.offerToWaitlist) await this.offerSlot(b.resource, b.start_at);
@@ -394,17 +394,17 @@ export class SenaAgent {
     const v = this.validateSlot(resource, startAt);
     if (!v.ok) return { ok: false, reason: v.reason };
     const blocked = this.blockFor(resource, startAt);
-    if (blocked) return { ok: false, code: 'bloqueado', reason: `Ese turno no está disponible (${blocked.reason}).` };
+    if (blocked) return { ok: false, code: 'bloqueado', reason: `That slot is not available (${blocked.reason}).` };
     const active = this.store.activeBookingForSlot(resource, startAt);
-    if (!active) return { ok: false, code: 'libre', reason: 'Ese turno está libre: podés reservarlo directamente.' };
-    if (active.customer_id === customer.id) return { ok: false, reason: 'Ese turno ya es tuyo.' };
+    if (!active) return { ok: false, code: 'libre', reason: 'That slot is free: you can book it directly.' };
+    if (active.customer_id === customer.id) return { ok: false, reason: 'That slot is already yours.' };
     this.ensureCustomer(customer);
     const { entry, created } = this.store.addWaitlist({
       resource, start_at: startAt, customer_id: customer.id, customer_name: customer.name, channel: customer.channel, created_at: this.now(),
     });
     const position = this.store.waitlistPosition(entry);
     if (created) {
-      this.log({ kind: 'lista_espera', rule: 'ANOTADO', reason: `Alguien se anotó en la lista de espera de ${resource}, ${this.fmt(startAt)} (puesto ${position}).`, data: { customer: customer.id } });
+      this.log({ kind: 'lista_espera', rule: 'ANOTADO', reason: `Someone joined the waitlist for ${resource}, ${this.fmt(startAt)} (position ${position}).`, data: { customer: customer.id } });
     }
     return { ok: true, position, created };
   }
@@ -420,15 +420,15 @@ export class SenaAgent {
       const r = this.reserve({ resource, startAt, customer, source: 'lista_espera', holdMinutes: this.policy.ofertaListaEsperaMinutos });
       if (!r.ok) {
         this.store.updateWaitlist(w.id, { status: 'expired' });
-        this.log({ kind: 'lista_espera', rule: 'SALTEADO', reason: `No se le pudo ofrecer el turno al siguiente de la lista: ${r.reason}`, data: { customer: w.customer_id } });
+        this.log({ kind: 'lista_espera', rule: 'SALTEADO', reason: `The slot could not be offered to the next person on the list: ${r.reason}`, data: { customer: w.customer_id } });
         if (['ocupado', 'turno_invalido', 'bloqueado'].includes(r.code)) return null;
         continue;
       }
       this.store.updateWaitlist(w.id, { status: 'offered', offered_booking_id: r.booking.id });
       await this.safeNotify(() => this.notifier.toCustomer(w.customer_id,
-        `🎾 Se liberó el turno que esperabas: ${resource}, ${this.fmt(startAt)}.\n` +
-        `Te lo guardo ${this.policy.ofertaListaEsperaMinutos} minutos. Seña: ${formatArs(r.booking.deposit_wei)}.\n` +
-        `Pagá acá: ${this.payUrl(r.booking)}`, { booking: r.booking, pay: true }));
+        `🎾 The slot you were waiting for is free: ${resource}, ${this.fmt(startAt)}.\n` +
+        `I will hold it for ${this.policy.ofertaListaEsperaMinutos} minutes. Deposit: ${formatArs(r.booking.deposit_wei)}.\n` +
+        `Pay here: ${this.payUrl(r.booking)}`, { booking: r.booking, pay: true }));
       return r.booking;
     }
   }
@@ -441,12 +441,12 @@ export class SenaAgent {
     const expired = this.store.expiredHolds(now);
     for (const b of expired) {
       this.store.updateBooking(b.id, { status: 'expired' }, now);
-      this.log({ booking_id: b.id, kind: 'vencimiento', rule: 'RESERVA_VENCIDA', reason: 'Pasó el tiempo para pagar la seña. Se libera el turno.' });
+      this.log({ booking_id: b.id, kind: 'vencimiento', rule: 'RESERVA_VENCIDA', reason: 'The time to pay the deposit has passed. The slot is released.' });
       if (b.source === 'lista_espera') {
         const w = this.store.waitlistByOfferedBooking(b.id);
         if (w) this.store.updateWaitlist(w.id, { status: 'expired' });
       }
-      await this.safeNotify(() => this.notifier.toCustomer(b.customer_id, `⌛ Se venció tu reserva ${b.id} (${this.fmt(b.start_at)}) porque no se pagó la seña a tiempo.`));
+      await this.safeNotify(() => this.notifier.toCustomer(b.customer_id, `⌛ Your booking ${b.id} (${this.fmt(b.start_at)}) expired because the deposit was not paid in time.`));
       await this.offerSlot(b.resource, b.start_at);
     }
     return expired.length;
@@ -458,7 +458,7 @@ export class SenaAgent {
     const done = this.store.finishedConfirmed(now - this.business.duracionMinutos * MINUTE);
     for (const b of done) {
       this.store.updateBooking(b.id, { status: 'completed' }, now);
-      this.log({ booking_id: b.id, kind: 'cierre_turno', rule: 'JUGADO', reason: 'El turno terminó. La seña pasa a ser del negocio.' });
+      this.log({ booking_id: b.id, kind: 'cierre_turno', rule: 'JUGADO', reason: 'The slot has ended. The deposit now belongs to the venue.' });
       this.queueNftUsed(b);
     }
     return done.length;
@@ -474,8 +474,8 @@ export class SenaAgent {
     const now = this.now();
     const amount = BigInt(amountWei);
     if (!to) {
-      this.log({ booking_id: booking?.id ?? null, kind: 'transferencia', rule: 'SIN_DESTINO', reason: 'No hay dirección a la que devolver. Lo tiene que resolver el dueño.' });
-      this.safeNotify(() => this.notifier.toOwner(`⚠️ Hay que devolver ${formatArs(amount)} de ${booking?.id ?? '¿?'} pero no hay dirección de destino.`));
+      this.log({ booking_id: booking?.id ?? null, kind: 'transferencia', rule: 'SIN_DESTINO', reason: 'There is no address to refund to. The owner has to resolve it.' });
+      this.safeNotify(() => this.notifier.toOwner(`⚠️ ${formatArs(amount)} must be refunded for ${booking?.id ?? '?'} but there is no destination address.`));
       return null;
     }
     const sentToday = this.store.refundsSentSince(startOfLocalDay(now, this.offset));
@@ -491,10 +491,10 @@ export class SenaAgent {
       this.store.updateBooking(booking.id, { refunded_wei: BigInt(current.refunded_wei) + amount }, now);
     }
     if (!lim.ok) {
-      this.log({ booking_id: booking?.id ?? null, kind: 'transferencia', rule: 'ESPERA_DUENO', reason: `${lim.reason} Queda esperando que el dueño la apruebe.`, data: { transfer: transfer.id, rule } });
+      this.log({ booking_id: booking?.id ?? null, kind: 'transferencia', rule: 'ESPERA_DUENO', reason: `${lim.reason} It waits for the owner to approve it.`, data: { transfer: transfer.id, rule } });
       this.safeNotify(() => this.notifier.toOwner(
-        `✋ Necesito tu aprobación para transferir ${formatArs(amount)} (${kind === 'refund' ? 'devolución' : 'retiro'}${booking ? ` de ${booking.id}` : ''}).\n` +
-        `Motivo: ${lim.reason}\nAprobá con /aprobar ${transfer.id} o rechazá con /rechazar ${transfer.id}.`));
+        `✋ I need your approval to transfer ${formatArs(amount)} (${kind === 'refund' ? 'refund' : 'withdrawal'}${booking ? ` for ${booking.id}` : ''}).\n` +
+        `Reason: ${lim.reason}\nApprove with /aprobar ${transfer.id} or reject with /rechazar ${transfer.id}.`));
     }
     return transfer;
   }
@@ -519,7 +519,7 @@ export class SenaAgent {
             const b = this.store.getBooking(t.booking_id);
             if (b) {
               await this.safeNotify(() => this.notifier.toCustomer(b.customer_id,
-                `↩️ Te devolví ${formatArs(t.amount_wei)} en wARS por la reserva ${b.id}.\nMotivo: ${t.note ?? ''}\nTx: ${hash}`));
+                `↩️ I refunded ${formatArs(t.amount_wei)} in wARS for booking ${b.id}.\nReason: ${t.note ?? ''}\nTx: ${hash}`));
             }
           }
         } catch (err) {
@@ -528,12 +528,12 @@ export class SenaAgent {
           this.log({
             booking_id: t.booking_id, kind: 'transferencia', rule: definitelyNotSent ? 'FALLO_SIN_ENVIAR' : 'ESTADO_INCIERTO',
             reason: definitelyNotSent
-              ? `No se pudo mandar la transferencia (no salió de la wallet): ${err.message}`
-              : `La transferencia pudo haber salido o no. No se reintenta sola: hay que revisarla en el explorador. ${err.message}`,
+              ? `The transfer could not be sent (it did not leave the wallet): ${err.message}`
+              : `The transfer may or may not have gone out. It is not retried on its own: check it in the explorer. ${err.message}`,
           });
           await this.safeNotify(() => this.notifier.toOwner(
-            `⚠️ Transferencia #${t.id} ${definitelyNotSent ? 'falló sin salir' : 'en estado incierto'}: ${err.message}\n` +
-            (definitelyNotSent ? `Reintentá con /aprobar ${t.id} cuando la wallet tenga saldo.` : 'Revisala antes de hacer nada.')));
+            `⚠️ Transfer #${t.id} ${definitelyNotSent ? 'failed without going out' : 'is in an uncertain state'}: ${err.message}\n` +
+            (definitelyNotSent ? `Retry with /aprobar ${t.id} when the wallet has funds.` : 'Check it before doing anything.')));
         }
       }
       return sent;
@@ -544,25 +544,25 @@ export class SenaAgent {
   /** El dueño aprueba una transferencia retenida por los topes (o reintenta una fallida). */
   async approveTransfer(id) {
     const t = this.store.getTransfer(Number(id));
-    if (!t) return { ok: false, reason: 'No existe esa transferencia.' };
-    if (!['needs_owner', 'failed'].includes(t.status)) return { ok: false, reason: `La transferencia está "${t.status}", no se puede aprobar.` };
+    if (!t) return { ok: false, reason: 'That transfer does not exist.' };
+    if (!['needs_owner', 'failed'].includes(t.status)) return { ok: false, reason: `The transfer is "${t.status}", it cannot be approved.` };
     this.store.updateTransfer(t.id, { status: 'pending' }, this.now());
-    this.log({ booking_id: t.booking_id, kind: 'transferencia', rule: 'APROBADA_POR_DUENO', reason: `El dueño aprobó la transferencia #${t.id} de ${formatArs(t.amount_wei)}.` });
+    this.log({ booking_id: t.booking_id, kind: 'transferencia', rule: 'APROBADA_POR_DUENO', reason: `The owner approved transfer #${t.id} of ${formatArs(t.amount_wei)}.` });
     await this.processTransfers();
     return { ok: true, transfer: this.store.getTransfer(t.id) };
   }
 
   async rejectTransfer(id) {
     const t = this.store.getTransfer(Number(id));
-    if (!t) return { ok: false, reason: 'No existe esa transferencia.' };
-    if (!['needs_owner', 'failed'].includes(t.status)) return { ok: false, reason: `La transferencia está "${t.status}", no se puede rechazar.` };
+    if (!t) return { ok: false, reason: 'That transfer does not exist.' };
+    if (!['needs_owner', 'failed'].includes(t.status)) return { ok: false, reason: `The transfer is "${t.status}", it cannot be rejected.` };
     const now = this.now();
     this.store.updateTransfer(t.id, { status: 'rejected' }, now);
     if (t.kind === 'refund' && t.booking_id) {
       const b = this.store.getBooking(t.booking_id);
       if (b) this.store.updateBooking(b.id, { refunded_wei: BigInt(b.refunded_wei) - BigInt(t.amount_wei) }, now);
     }
-    this.log({ booking_id: t.booking_id, kind: 'transferencia', rule: 'RECHAZADA_POR_DUENO', reason: `El dueño rechazó la transferencia #${t.id}.` });
+    this.log({ booking_id: t.booking_id, kind: 'transferencia', rule: 'RECHAZADA_POR_DUENO', reason: `The owner rejected transfer #${t.id}.` });
     return { ok: true };
   }
 
@@ -636,19 +636,19 @@ export class SenaAgent {
             } else {
               const { hash } = await this.nft.mint({ to: row.nft_to ?? cur.payer, tokenId, uri: tokenUri(this.ticketDe(cur)) });
               this.store.updateBooking(row.id, { nft_state: 'minted', nft_action: null, nft_tx: hash, nft_attempts: 0, nft_error: null }, hoy());
-              this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_ENVIADO', reason: `Le mandó la reserva a su billetera como un ticket NFT intransferible (${this.nft.redNombre}).`, tx: hash });
-              await this.safeNotify(() => this.notifier.toCustomer(cur.customer_id, `🎟️ Tu reserva ${cur.id} ya está en tu billetera como NFT.\n${this.nft.urlToken(tokenId)}`));
+              this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_ENVIADO', reason: `Sent the booking to its wallet as a non-transferable NFT ticket (${this.nft.redNombre}).`, tx: hash });
+              await this.safeNotify(() => this.notifier.toCustomer(cur.customer_id, `🎟️ Your booking ${cur.id} is now in your wallet as an NFT.\n${this.nft.urlToken(tokenId)}`));
             }
           } else if (row.nft_action === 'burn') {
             if (await this.nft.exists(tokenId)) {
               const { hash } = await this.nft.burn(tokenId);
-              this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_QUEMADO', reason: 'Se canceló la reserva, así que se quemó su ticket NFT.', tx: hash });
+              this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_QUEMADO', reason: 'The booking was cancelled, so its NFT ticket was burned.', tx: hash });
             }
             this.store.updateBooking(row.id, { nft_state: 'burned', nft_action: null, nft_attempts: 0, nft_error: null }, hoy());
           } else if (row.nft_action === 'used') {
             if (await this.nft.exists(tokenId)) {
               const { hash } = await this.nft.setUri(tokenId, tokenUri(this.ticketDe(cur, 'jugada')));
-              this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_USADO', reason: 'El turno se jugó: el ticket NFT pasó a "jugada" y queda como recuerdo.', tx: hash });
+              this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_USADO', reason: 'The slot was played: the NFT ticket changed to "played" and stays as a keepsake.', tx: hash });
             }
             this.store.updateBooking(row.id, { nft_state: 'used', nft_action: null, nft_attempts: 0, nft_error: null }, hoy());
           }
@@ -658,8 +658,8 @@ export class SenaAgent {
           this.store.updateBooking(row.id, { nft_attempts: intentos, nft_error: String(err.shortMessage ?? err.message).slice(0, 300) }, this.now());
           this.logger.warn?.(`[nft] ${row.id} ${row.nft_action}: ${err.message}`);
           if (intentos >= SenaAgent.NFT_MAX_INTENTOS) {
-            this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_FALLO', reason: `No se pudo ${{ mint: 'mandar', burn: 'quemar', used: 'actualizar' }[row.nft_action]} el ticket NFT después de ${intentos} intentos. La reserva no se ve afectada: el dueño puede reintentar desde el panel.` });
-            await this.safeNotify(() => this.notifier.toOwner(`⚠️ El ticket NFT de ${row.id} falló ${intentos} veces (${err.message}). La reserva sigue en pie. Podés reintentar desde el panel.`));
+            this.log({ booking_id: row.id, kind: 'nft', rule: 'NFT_FALLO', reason: `The NFT ticket could not be ${{ mint: 'sent', burn: 'burned', used: 'updated' }[row.nft_action]} after ${intentos} attempts. The booking is not affected: the owner can retry from the dashboard.` });
+            await this.safeNotify(() => this.notifier.toOwner(`⚠️ The NFT ticket for ${row.id} failed ${intentos} times (${err.message}). The booking stands. You can retry from the dashboard.`));
           }
         }
       }
@@ -670,11 +670,11 @@ export class SenaAgent {
 
   /** El dueño reintenta el ticket de una reserva que falló. */
   async retryNft(bookingId) {
-    if (!this.nft) return { ok: false, reason: 'Esta instalación no usa tickets NFT.' };
+    if (!this.nft) return { ok: false, reason: 'This installation does not use NFT tickets.' };
     const b = this.store.getBooking(bookingId);
-    if (!b) return { ok: false, reason: 'No existe esa reserva.' };
+    if (!b) return { ok: false, reason: 'That booking does not exist.' };
     const action = b.nft_action ?? (b.status === 'confirmed' && !b.nft_state ? 'mint' : null);
-    if (!action) return { ok: false, reason: 'Ese ticket no tiene nada pendiente.' };
+    if (!action) return { ok: false, reason: 'That ticket has nothing pending.' };
     this.store.updateBooking(b.id, { nft_action: action, nft_token_id: b.nft_token_id ?? String(tokenIdFor(b.id)), nft_to: b.nft_to ?? b.payer, nft_attempts: 0, nft_error: null }, this.now());
     await this.processNft();
     return { ok: true, nft: this.nftInfo(this.store.getBooking(b.id)) };
@@ -717,24 +717,24 @@ export class SenaAgent {
     const reserve = arsToWei(this.business.cierre?.reservaMinimaArs ?? 0);
     const p = decidePayout({ balanceWei: balance, liabilitiesWei: liabilities, reserveWei: reserve, maxTransferWei: arsToWei(this.limits.transferenciaMaxArs) });
 
-    let payoutLine = `Retiro: ${p.reason}`;
+    let payoutLine = `Withdrawal: ${p.reason}`;
     if (p.amountWei > 0n) {
       if (!this.payoutAddress) {
-        payoutLine += ' No hay dirección de retiro configurada (OWNER_PAYOUT_ADDRESS), así que no se transfiere nada.';
+        payoutLine += ' No withdrawal address is configured (OWNER_PAYOUT_ADDRESS), so nothing is transferred.';
       } else {
         const t = this.queueTransfer({ kind: 'payout', to: this.payoutAddress, amountWei: p.amountWei, idemKey: `payout:${day}`, note: p.reason, rule: p.rule });
-        payoutLine += t ? ` Transferencia #${t.id} a ${this.payoutAddress}.` : '';
+        payoutLine += t ? ` Transfer #${t.id} to ${this.payoutAddress}.` : '';
       }
     }
     this.log({ kind: 'cierre', rule: p.rule, reason: p.reason, data: { day, balance, liabilities, collected, refunded } });
 
     const report = [
-      `📊 Cierre del ${day} — ${this.business.nombre}`,
-      `Señas cobradas: ${cobros.length} (${formatArs(collected)})`,
-      `Devoluciones enviadas: ${formatArs(refunded)}`,
-      `Cancelaciones: a tiempo ${count('A_TIEMPO')}, parciales ${count('TARDE_PARCIAL')}, tardías ${count('MUY_TARDE')}, sin pago ${count('SIN_PAGO')}`,
-      `Reservas vencidas: ${count('RESERVA_VENCIDA')} · Turnos reubicados desde la lista de espera: ${count('OFERTA_LISTA_ESPERA')}`,
-      `Saldo de la wallet: ${formatArs(balance)} · Comprometido: ${formatArs(liabilities)}`,
+      `📊 Close of ${day} — ${this.business.nombre}`,
+      `Deposits collected: ${cobros.length} (${formatArs(collected)})`,
+      `Refunds sent: ${formatArs(refunded)}`,
+      `Cancellations: on time ${count('A_TIEMPO')}, partial ${count('TARDE_PARCIAL')}, late ${count('MUY_TARDE')}, unpaid ${count('SIN_PAGO')}`,
+      `Expired bookings: ${count('RESERVA_VENCIDA')} · Slots reassigned from the waitlist: ${count('OFERTA_LISTA_ESPERA')}`,
+      `Wallet balance: ${formatArs(balance)} · Committed: ${formatArs(liabilities)}`,
       payoutLine,
     ].join('\n');
     this.store.setSetting('ultimo_cierre', { at: now, day, report }, now);
@@ -760,7 +760,7 @@ export class SenaAgent {
     if (res.changes.length) {
       this.log({
         kind: 'configuracion', rule: 'CONFIGURACION_CAMBIADA',
-        reason: `El comercio cambió su configuración (${res.changes.map((c) => c.field).join(', ')}). Vale para reservas nuevas; las ya pagadas conservan sus condiciones.`,
+        reason: `The venue changed its settings (${res.changes.map((c) => c.field).join(', ')}). It applies to new bookings; those already paid keep their terms.`,
       });
     }
     return res;
@@ -782,31 +782,31 @@ export class SenaAgent {
     const errors = [];
     const err = (campo, mensaje) => errors.push({ campo, mensaje });
     const reason = String(motivo ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
-    if (!reason) err('motivo', 'Contá el motivo del bloqueo: lo ven los clientes.');
-    else if (reason.length > 120) err('motivo', 'El motivo puede tener hasta 120 caracteres.');
-    if (!['turno', 'recurso', 'dia'].includes(tipo)) err('tipo', 'El bloqueo es de un turno, de una cancha o de un día entero.');
-    if (!isValidDateStr(fecha)) err('fecha', 'La fecha no es válida (usá el calendario).');
+    if (!reason) err('motivo', 'Give the reason for the block: customers can see it.');
+    else if (reason.length > 120) err('motivo', 'The reason can have up to 120 characters.');
+    if (!['turno', 'recurso', 'dia'].includes(tipo)) err('tipo', 'A block covers one slot, one court or a whole day.');
+    if (!isValidDateStr(fecha)) err('fecha', 'The date is not valid (use the calendar).');
     let last = fecha;
     if (hasta !== undefined && hasta !== null && hasta !== '') {
-      if (!isValidDateStr(hasta)) err('hasta', 'La fecha "hasta" no es válida.');
-      else if (isValidDateStr(fecha) && hasta < fecha) err('hasta', 'La fecha "hasta" no puede ser anterior a "desde".');
-      else if (isValidDateStr(fecha) && hasta > addDays(fecha, 366)) err('hasta', 'Un bloqueo puede durar hasta un año.');
+      if (!isValidDateStr(hasta)) err('hasta', 'The "until" date is not valid.');
+      else if (isValidDateStr(fecha) && hasta < fecha) err('hasta', 'The "until" date cannot be before "from".');
+      else if (isValidDateStr(fecha) && hasta > addDays(fecha, 366)) err('hasta', 'A block can last up to one year.');
       else last = hasta;
     }
     if (tipo === 'turno' || tipo === 'recurso') {
-      if (!this.business.recursosTodos.includes(recurso)) err('recurso', 'Elegí una cancha de la lista.');
+      if (!this.business.recursosTodos.includes(recurso)) err('recurso', 'Pick a court from the list.');
     }
     let from; let to;
     if (errors.length === 0) {
       if (tipo === 'turno') {
-        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(hora))) err('hora', 'Elegí el horario del turno.');
-        else if (!hoursFor(this.business, recurso, weekdayOf(fecha)).includes(hora)) err('hora', `A las ${hora} no hay turno en ${recurso} ese día.`);
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(hora))) err('hora', 'Pick the slot time.');
+        else if (!hoursFor(this.business, recurso, weekdayOf(fecha)).includes(hora)) err('hora', `There is no slot at ${hora} on ${recurso} that day.`);
         else { from = localToUtcMs(fecha, hora, this.offset); to = from + this.business.duracionMinutos * MINUTE; }
       } else {
         from = localToUtcMs(fecha, '00:00', this.offset);
         to = localToUtcMs(addDays(last, 1), '00:00', this.offset);
       }
-      if (errors.length === 0 && to <= this.now()) err('fecha', 'Ese bloqueo ya pasó.');
+      if (errors.length === 0 && to <= this.now()) err('fecha', 'That block is already in the past.');
     }
     if (errors.length) return { ok: false, errors };
 
@@ -814,28 +814,28 @@ export class SenaAgent {
       kind: tipo, resource: tipo === 'dia' ? null : recurso, from_at: from, to_at: to, reason,
       created_at: this.now(), created_by: ip ? `${actor} (${ip})` : actor,
     });
-    const scope = tipo === 'turno' ? `el turno de ${recurso} del ${this.fmt(from)}`
-      : `${tipo === 'recurso' ? recurso : 'todas las canchas'} ${last === fecha ? `el ${fecha}` : `del ${fecha} al ${last}`}`;
+    const scope = tipo === 'turno' ? `the ${recurso} slot on ${this.fmt(from)}`
+      : `${tipo === 'recurso' ? recurso : 'all courts'} ${last === fecha ? `on ${fecha}` : `from ${fecha} to ${last}`}`;
     const affected = this.bookingsAffectedBy(block);
     this.log({
       kind: 'bloqueo', rule: 'BLOQUEO_CREADO',
-      reason: `El comercio bloqueó ${scope}.${affected.length ? ` Hay ${affected.length} reserva(s) adentro que el comercio tiene que resolver.` : ''}`,
+      reason: `The venue blocked ${scope}.${affected.length ? ` There are ${affected.length} booking(s) inside that the venue has to resolve.` : ''}`,
     });
     return { ok: true, block, affected };
   }
 
   removeBlock(id) {
     const block = this.store.getBlock(Number(id));
-    if (!block || block.removed_at) return { ok: false, reason: 'No existe ese bloqueo.' };
+    if (!block || block.removed_at) return { ok: false, reason: 'That block does not exist.' };
     this.store.removeBlock(block.id, this.now());
-    this.log({ kind: 'bloqueo', rule: 'BLOQUEO_QUITADO', reason: `El comercio quitó un bloqueo (${block.kind}). Esos turnos vuelven a estar disponibles.` });
+    this.log({ kind: 'bloqueo', rule: 'BLOQUEO_QUITADO', reason: `The venue removed a block (${block.kind}). Those slots are available again.` });
     return { ok: true };
   }
 
   /** Cancela con devolución total las reservas que quedaron dentro de un bloqueo. Pasa por el mismo agente (topes y decisiones). */
   async cancelBlockedBookings(blockId) {
     const block = this.store.getBlock(Number(blockId));
-    if (!block || block.removed_at) return { ok: false, reason: 'No existe ese bloqueo.' };
+    if (!block || block.removed_at) return { ok: false, reason: 'That block does not exist.' };
     const results = [];
     for (const b of this.bookingsAffectedBy(block)) {
       const r = await this.cancel({ bookingId: b.id, by: 'owner', fullRefund: true, reason: block.reason });
@@ -954,7 +954,7 @@ export class SenaAgent {
     const day = localDateStr(now, this.offset);
     const from = localToUtcMs(day, '00:00', this.offset);
     const rows = this.store.activeBookingsBetween(from, localToUtcMs(addDays(day, 1), '00:00', this.offset));
-    if (rows.length === 0) return `Hoy (${day}) no hay turnos reservados.`;
-    return [`Turnos de hoy (${day}):`, ...rows.map((b) => `• ${this.describe(b)} — ${b.customer_name ?? b.customer_id}`)].join('\n');
+    if (rows.length === 0) return `No slots are booked today (${day}).`;
+    return [`Today's slots (${day}):`, ...rows.map((b) => `• ${this.describe(b)} — ${b.customer_name ?? b.customer_id}`)].join('\n');
   }
 }

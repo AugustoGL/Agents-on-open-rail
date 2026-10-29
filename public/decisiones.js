@@ -1,9 +1,9 @@
-// Registro público de decisiones del agente. Los datos entran siempre como texto.
+// Public log de decisiones del agente. Los datos entran siempre como texto.
 import { h, $, setChildren, request, carteles, barraCliente, aviso, esqueletos, vacio } from '/static/dom.js';
 import { GRUPOS, grupoDe, agruparPorDia, tarjetaDecision } from '/static/decisiones-vista.js';
 
 const S = { negocio: null, resumen: null, decisiones: [], grupo: '', cargando: true, error: null };
-const errorDeRed = (err) => (err.status ? err.message : 'No pudimos conectarnos. Revisá tu conexión y probá de nuevo.');
+const errorDeRed = (err) => (err.status ? err.message : 'We could not connect. Check your connection and try again.');
 
 const nbsp = (s) => String(s).replace('$ ', '$ ');
 
@@ -14,11 +14,11 @@ function renderNumeros() {
   if (!r) { setChildren(el); return; }
   const dato = (valor, texto) => h('div', { class: 'estadistica' }, h('strong', { class: 'num' }, valor), h('span', {}, texto));
   setChildren(el,
-    dato(r.decisiones, r.decisiones === 1 ? 'decisión registrada' : 'decisiones registradas'),
-    dato(r.senasCobradas, r.senasCobradas === 1 ? 'seña cobrada' : 'señas cobradas'),
-    dato(nbsp(r.montoDevuelto), `devuelto (${r.devolucionesEnviadas} ${r.devolucionesEnviadas === 1 ? 'devolución' : 'devoluciones'})`),
-    dato(r.turnosReubicados, r.turnosReubicados === 1 ? 'turno ofrecido a la lista de espera' : 'turnos ofrecidos a la lista de espera'),
-    dato(r.reservasLiberadas, r.reservasLiberadas === 1 ? 'reserva liberada por falta de pago' : 'reservas liberadas por falta de pago'));
+    dato(r.decisiones, r.decisiones === 1 ? 'decision logged' : 'decisions logged'),
+    dato(r.senasCobradas, r.senasCobradas === 1 ? 'deposit collected' : 'deposits collected'),
+    dato(nbsp(r.montoDevuelto), `refunded (${r.devolucionesEnviadas} ${r.devolucionesEnviadas === 1 ? 'refund' : 'refunds'})`),
+    dato(r.turnosReubicados, r.turnosReubicados === 1 ? 'slot offered to the waitlist' : 'slots offered to the waitlist'),
+    dato(r.reservasLiberadas, r.reservasLiberadas === 1 ? 'booking released for non-payment' : 'bookings released for non-payment'));
 }
 
 function renderReglas() {
@@ -40,16 +40,16 @@ function renderLista() {
   lista.setAttribute('aria-busy', String(S.cargando));
   if (S.cargando) { setChildren(lista, esqueletos()); return; }
   if (S.error) {
-    setChildren(lista, aviso('error', h('strong', {}, 'No pudimos cargar el registro'), S.error,
-      h('div', { class: 'acciones' }, h('button', { class: 'btn btn-secundario', type: 'button', onclick: cargar }, 'Probar de nuevo'))));
+    setChildren(lista, aviso('error', h('strong', {}, 'We could not load the log'), S.error,
+      h('div', { class: 'acciones' }, h('button', { class: 'btn btn-secundario', type: 'button', onclick: cargar }, 'Try again'))));
     return;
   }
   const visibles = S.decisiones.filter((d) => !S.grupo || grupoDe(d) === S.grupo);
   if (visibles.length === 0) {
     setChildren(lista, vacio({
-      icon: 'doc', titulo: S.decisiones.length ? 'No hay decisiones de este tipo' : 'Todavía no hay decisiones',
-      texto: S.decisiones.length ? 'Probá con otro filtro.' : 'Apenas alguien reserve, pague o cancele un turno, lo vas a ver acá.',
-      accion: S.decisiones.length ? null : h('a', { class: 'btn btn-primario', href: '/' }, 'Reservar un turno'),
+      icon: 'doc', titulo: S.decisiones.length ? 'No decisions of this type' : 'No decisions yet',
+      texto: S.decisiones.length ? 'Try another filter.' : 'As soon as someone books, pays or cancels a slot, you will see it here.',
+      accion: S.decisiones.length ? null : h('a', { class: 'btn btn-primario', href: '/' }, 'Book a slot'),
     }));
     return;
   }

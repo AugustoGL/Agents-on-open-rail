@@ -199,7 +199,7 @@ Guardate todos los hashes: son la prueba para la entrega.
 
 Si un pago falla con un error del facilitador sobre extensiones, probá `X402_BUILDER_CODE=false` en `.env`.
 
-## 11. Panel del comercio y configuración del negocio
+## 11. Panel del comercio (venue dashboard) y configuración del negocio
 
 1. En `.env` poné una clave para el panel (mínimo 8 caracteres) y reiniciá:
 
@@ -209,15 +209,15 @@ Si un pago falla con un error del facilitador sobre extensiones, probá `X402_BU
 
    Sin esa variable el panel queda **deshabilitado** (la página `/panel` lo dice). Si lo publicás por un túnel o proxy, poné también `TRUST_PROXY=true` para que el límite de intentos cuente la IP real de cada persona.
 2. Abrí `http://localhost:8402/panel` (o tu dirección https) e ingresá con la clave. Tras 5 intentos fallidos desde una misma IP se bloquea el ingreso por 15 minutos.
-3. Secciones: **Hoy**, **Calendario** (día y semana), **Reservas** (cancelar con vista previa), **Pendientes** (aprobar o rechazar), **Bloqueos**, **Decisiones del agente**, **Configuración** y **Cierre del día**. En el celular las cuatro primeras están en el menú inferior y el resto en "Más"; en pantallas grandes hay una barra lateral.
+3. Secciones: **Today**, **Calendar** (día y semana), **Bookings** (cancelar con vista previa), **Pending** (aprobar o rechazar), **Blocks**, **Agent decisions**, **Settings** y **Daily close**. En el celular las cuatro primeras están en el menú inferior y el resto under "More"; en pantallas grandes hay una barra lateral.
 
-**La configuración vive en la base de datos.** `config/negocio.json` se importa **una sola vez**, cuando la base está vacía; cambiarlo después no tiene efecto. Todo se edita en **Configuración**: nombre y descripción, canchas (agregar, renombrar y desactivar; no se borran), horarios base, por día de la semana y por cancha (dejá vacío para usar los base, o marcá "Cerrado"), duración, anticipación, precio, % de seña, minutos para pagar, política de cancelación, topes del agente y hora del cierre. Cada valor se valida al guardar y el panel marca el campo con el problema. Para no gastar mucho en pruebas podés bajar el precio (ej. 400 → seña de $100).
+**La configuración vive en la base de datos.** `config/negocio.json` se importa **una sola vez**, cuando la base está vacía; cambiarlo después no tiene efecto. Todo se edita en **Settings**: nombre y descripción, canchas (agregar, renombrar y desactivar; no se borran), horarios base, por día de la semana y por cancha (dejá vacío para usar los base, o marcá "Cerrado"), duración, anticipación, precio, % de seña, minutos para pagar, política de cancelación, topes del agente y hora del cierre. Cada valor se valida al guardar y el panel marca el campo con el problema. Para no gastar mucho en pruebas podés bajar el precio (ej. 400 → seña de $100).
 
 - **Los cambios valen para reservas nuevas.** Las reservas ya hechas conservan la seña y la política con las que se pagaron.
 - Cada cambio queda en el **Historial de cambios** (quién, cuándo, antes y después) y en Decisiones.
 - **Solo se cambian en `.env`** (por seguridad): la dirección de retiro, las claves, `PAY_TO` y el modo.
 
-**Bloqueos** (feriados, mantenimiento, un turno puntual): en la sección Bloqueos elegí un día entero, una cancha (uno o varios días) o un turno, con un motivo (**lo ven los clientes**). Si ya hay reservas pagadas adentro, el panel te avisa y te ofrece "Cancelar esas reservas y devolver todo": pasa por el agente (con sus topes: si supera el tope automático queda en Pendientes para que la apruebes) y queda en Decisiones. También podés bloquear un turno tocándolo en el Calendario.
+**Blocks** (feriados, mantenimiento, un turno puntual): en la sección Bloqueos elegí un día entero, una cancha (uno o varios días) o un turno, con un motivo (**lo ven los clientes**). Si ya hay reservas pagadas adentro, el panel te avisa y te ofrece "Cancelar esas reservas y devolver todo": pasa por el agente (con sus topes: si supera el tope automático queda en Pendientes para que la apruebes) y queda en Decisiones. También podés bloquear un turno tocándolo en el Calendario.
 
 ## 12. Datos de demostración y capturas
 

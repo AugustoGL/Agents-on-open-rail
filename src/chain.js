@@ -89,7 +89,7 @@ export function createMockChain({ address = '0x000000000000000000000000000000000
       }
       const amount = BigInt(amountWei);
       if (amount > state.balance) {
-        const e = new Error('Saldo insuficiente de wARS (simulado).');
+        const e = new Error('Insufficient wARS balance (simulated).');
         e.notSent = true;
         throw e;
       }

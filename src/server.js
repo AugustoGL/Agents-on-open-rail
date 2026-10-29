@@ -93,7 +93,7 @@ export function createApp({
         const r = await payingFetch(`http://127.0.0.1:${req.socket.localPort}/api/reservas/${req.params.id}/pagar`, { method: 'POST' });
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));
-          return res.status(r.status === 402 ? 502 : r.status).json({ error: body.error ?? 'No se pudo hacer el pago de prueba.', codigo: body.codigo });
+          return res.status(r.status === 402 ? 502 : r.status).json({ error: body.error ?? 'The test payment could not be made.', codigo: body.codigo });
         }
         return res.json({ ok: true, tx: readPaymentResponse(r)?.transaction ?? null });
       } catch (err) { return next(err); }
@@ -128,18 +128,18 @@ export function createApp({
       anticipacionMinimaMinutos: b.anticipacionMinimaMinutos,
       reservaSinPagarMinutos: b.reservaSinPagarMinutos,
       politica: [
-        `Cancelando con ${p.devolucionTotalHorasAntes} h o más de anticipación se devuelve toda la seña.`,
-        `Entre ${p.devolucionParcialHorasAntes} y ${p.devolucionTotalHorasAntes} h antes se devuelve el ${p.devolucionParcialPorcentaje}%.`,
-        `Con menos de ${p.devolucionParcialHorasAntes} h la seña queda para el negocio.`,
-        p.devolverSiSeRevende ? 'Si el turno se vuelve a vender, se devuelve lo retenido.' : null,
-        `Las reservas sin pagar se liberan a los ${b.reservaSinPagarMinutos} minutos.`,
+        `Cancelling ${p.devolucionTotalHorasAntes} h or more ahead refunds the whole deposit.`,
+        `Between ${p.devolucionParcialHorasAntes} and ${p.devolucionTotalHorasAntes} h ahead, ${p.devolucionParcialPorcentaje}% is refunded.`,
+        `Under ${p.devolucionParcialHorasAntes} h, the deposit stays with the venue.`,
+        p.devolverSiSeRevende ? 'If the slot is resold, what was kept is refunded.' : null,
+        `Unpaid bookings are released after ${b.reservaSinPagarMinutos} minutes.`,
       ].filter(Boolean),
     });
   });
 
   app.get('/api/turnos', (req, res) => {
     const fecha = typeof req.query.fecha === 'string' ? req.query.fecha : undefined;
-    if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return res.status(400).json({ error: 'fecha tiene que ser YYYY-MM-DD' });
+    if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return res.status(400).json({ error: 'fecha must be YYYY-MM-DD' });
     const dias = agent.bookableDays();
     const dia = fecha ?? dias.find((d) => agent.listSlots({ dateStr: d, onlyFree: true }).length > 0) ?? dias[0];
     const slots = agent.listSlots({ dateStr: dia, onlyFree: req.query.libres !== 'no' });
@@ -159,14 +159,14 @@ export function createApp({
     const body = req.body ?? {};
     const startAt = parseStart(body, agent);
     if (!body.recurso || startAt == null) {
-      return res.status(400).json({ error: 'Mandá recurso y (inicio ISO) o (fecha YYYY-MM-DD y hora HH:MM).' });
+      return res.status(400).json({ error: 'Send recurso and either (inicio ISO) or (fecha YYYY-MM-DD and hora HH:MM).' });
     }
     const wallet = body.cliente?.wallet && isAddress(body.cliente.wallet) ? getAddress(body.cliente.wallet) : undefined;
     const token = typeof body.cliente?.token === 'string' && /^api:[a-f0-9]{32}$/.test(body.cliente.token)
       ? body.cliente.token
       : `api:${randomBytes(16).toString('hex')}`;
     const customer = {
-      id: token, name: cleanText(body.cliente?.nombre, 60) || 'Cliente API', channel: body.cliente?.canal === 'web' ? 'web' : 'api', wallet,
+      id: token, name: cleanText(body.cliente?.nombre, 60) || 'API customer', channel: body.cliente?.canal === 'web' ? 'web' : 'api', wallet,
       contact: cleanText(body.cliente?.contacto, 80) || undefined,
     };
     const r = agent.reserve({ resource: body.recurso, startAt, customer });
@@ -179,7 +179,7 @@ export function createApp({
 
   app.get('/api/reservas/:id', (req, res) => {
     const b = agent.store.getBooking(req.params.id);
-    if (!b) return res.status(404).json({ error: 'No existe esa reserva.' });
+    if (!b) return res.status(404).json({ error: 'That booking does not exist.' });
     res.json({ reserva: publicBooking(agent, b) });
   });
 
@@ -187,14 +187,14 @@ export function createApp({
   app.get('/api/reservas/:id/nft', (req, res) => {
     const b = agent.store.getBooking(req.params.id);
     const info = b ? agent.nftInfo(b) : null;
-    if (!b || !info) return res.status(404).json({ error: 'Esta reserva no tiene ticket NFT.' });
+    if (!b || !info) return res.status(404).json({ error: 'This booking has no NFT ticket.' });
     return res.json({ nft: info, metadata: agent.ticketDe(b) });
   });
 
   app.post('/api/reservas/:id/cancelar', async (req, res, next) => {
     try {
       const token = req.body?.clienteToken;
-      if (typeof token !== 'string') return res.status(400).json({ error: 'Falta clienteToken.' });
+      if (typeof token !== 'string') return res.status(400).json({ error: 'clienteToken is missing.' });
       const r = await agent.cancel({ bookingId: req.params.id, customerId: token });
       if (!r.ok) return res.status(409).json({ error: r.reason });
       res.json({ ok: true, regla: r.rule, motivo: r.reason, devolucion: formatArs(r.refundWei) });
@@ -204,8 +204,8 @@ export function createApp({
   app.post('/api/reservas/:id/lista-espera', (req, res) => {
     const b = agent.store.getBooking(req.params.id);
     const token = req.body?.clienteToken;
-    if (!b || typeof token !== 'string') return res.status(400).json({ error: 'Falta la reserva o el clienteToken.' });
-    const r = agent.joinWaitlist({ resource: b.resource, startAt: b.start_at, customer: { id: token, name: 'Cliente API', channel: 'api' } });
+    if (!b || typeof token !== 'string') return res.status(400).json({ error: 'The booking or the clienteToken is missing.' });
+    const r = agent.joinWaitlist({ resource: b.resource, startAt: b.start_at, customer: { id: token, name: 'API customer', channel: 'api' } });
     if (!r.ok) return res.status(409).json({ error: r.reason });
     res.json({ ok: true, puesto: r.position });
   });
@@ -214,10 +214,10 @@ export function createApp({
   app.post('/api/lista-espera', limitCreates, (req, res) => {
     const body = req.body ?? {};
     const startAt = parseStart(body, agent);
-    if (!body.recurso || startAt == null) return res.status(400).json({ error: 'Mandá recurso y (inicio ISO) o (fecha YYYY-MM-DD y hora HH:MM).' });
+    if (!body.recurso || startAt == null) return res.status(400).json({ error: 'Send recurso and either (inicio ISO) or (fecha YYYY-MM-DD and hora HH:MM).' });
     const token = typeof body.cliente?.token === 'string' && TOKEN_RE.test(body.cliente.token) ? body.cliente.token : `api:${randomBytes(16).toString('hex')}`;
     const customer = {
-      id: token, name: cleanText(body.cliente?.nombre, 60) || 'Cliente web', channel: body.cliente?.canal === 'web' ? 'web' : 'api',
+      id: token, name: cleanText(body.cliente?.nombre, 60) || 'Web customer', channel: body.cliente?.canal === 'web' ? 'web' : 'api',
       contact: cleanText(body.cliente?.contacto, 80) || undefined,
     };
     const r = agent.joinWaitlist({ resource: body.recurso, startAt, customer });
@@ -228,7 +228,7 @@ export function createApp({
   // "Mis reservas" de la web: el clienteToken viaja en el cuerpo (nunca en la URL).
   app.post('/api/mis-reservas', (req, res) => {
     const token = req.body?.clienteToken;
-    if (typeof token !== 'string' || !TOKEN_RE.test(token)) return res.status(400).json({ error: 'Falta el clienteToken.' });
+    if (typeof token !== 'string' || !TOKEN_RE.test(token)) return res.status(400).json({ error: 'The clienteToken is missing.' });
     const reservas = agent.store.bookingsForCustomer(token).map((b) => publicBooking(agent, b));
     const esperas = agent.store.waitlistForCustomer(token).map((w) => ({
       recurso: w.resource, inicio: new Date(w.start_at).toISOString(), inicioLocal: agent.fmt(w.start_at),
@@ -240,7 +240,7 @@ export function createApp({
   // Antes de cancelar: cuánto devuelve la política y por qué (la que valía cuando se pagó).
   app.post('/api/reservas/:id/cancelar-vista', (req, res) => {
     const token = req.body?.clienteToken;
-    if (typeof token !== 'string') return res.status(400).json({ error: 'Falta clienteToken.' });
+    if (typeof token !== 'string') return res.status(400).json({ error: 'clienteToken is missing.' });
     const p = agent.previewCancel({ bookingId: req.params.id, customerId: token });
     if (!p.ok) return res.status(409).json({ error: p.reason });
     return res.json({ ok: true, devolucion: formatArs(p.refundWei), regla: p.rule, motivo: p.reason, reserva: publicBooking(agent, p.booking) });
@@ -255,26 +255,26 @@ export function createApp({
   const sesiones = new Map(); // sesión -> { direccion, expira }
   const barrer = (mapa) => { const t = ahora(); for (const [k, v] of mapa) if (v.expira <= t) mapa.delete(k); };
   const mensajeDeFirma = ({ direccion, host, nonce, expira }) => [
-    'Seña · Ver mis reservas',
+    'Seña · See my bookings',
     '',
-    'Firmá para demostrar que esta billetera es tuya y ver tus reservas.',
-    'Firmar no cuesta nada ni mueve plata.',
+    'Sign to prove this wallet is yours and see your bookings.',
+    'Signing costs nothing and moves no money.',
     '',
-    `Billetera: ${direccion}`,
-    `Sitio: ${host}`,
-    `Código: ${nonce}`,
-    `Vence: ${new Date(expira).toISOString()}`,
+    `Wallet: ${direccion}`,
+    `Site: ${host}`,
+    `Code: ${nonce}`,
+    `Expires: ${new Date(expira).toISOString()}`,
   ].join('\n');
   const sesionDe = (req) => {
     const s = typeof req.body?.sesion === 'string' ? sesiones.get(req.body.sesion) : null;
     return s && s.expira > ahora() ? s : null;
   };
-  const sinSesion = (res) => res.status(401).json({ error: 'Pasó mucho tiempo. Volvé a conectar tu billetera para ver tus reservas.', codigo: 'sin_sesion' });
+  const sinSesion = (res) => res.status(401).json({ error: 'Too much time has passed. Connect your wallet again to see your bookings.', codigo: 'sin_sesion' });
   const suyas = (s) => agent.store.bookingsForPayer(s.direccion).map((b) => publicBooking(agent, b));
 
   app.post('/api/billetera/desafio', limitCreates, (req, res) => {
     const dir = req.body?.direccion;
-    if (typeof dir !== 'string' || !isAddress(dir)) return res.status(400).json({ error: 'La dirección de la billetera no es válida.' });
+    if (typeof dir !== 'string' || !isAddress(dir)) return res.status(400).json({ error: 'The wallet address is not valid.' });
     barrer(desafios);
     const direccion = getAddress(dir);
     const nonce = randomBytes(16).toString('hex');
@@ -288,15 +288,15 @@ export function createApp({
     try {
       const { direccion, nonce, firma } = req.body ?? {};
       if (typeof direccion !== 'string' || !isAddress(direccion) || typeof nonce !== 'string' || !/^[a-f0-9]{32}$/.test(nonce) || typeof firma !== 'string' || !/^0x[a-fA-F0-9]{130,}$/.test(firma) || firma.length > 600) {
-        return res.status(400).json({ error: 'Faltan datos para verificar la billetera.' });
+        return res.status(400).json({ error: 'Data needed to verify the wallet is missing.' });
       }
       const d = desafios.get(nonce);
       desafios.delete(nonce); // de un solo uso, aunque la firma salga mal
       if (!d || d.expira <= ahora() || d.direccion !== getAddress(direccion)) {
-        return res.status(401).json({ error: 'El pedido venció o no es válido. Volvé a conectar tu billetera.', codigo: 'desafio' });
+        return res.status(401).json({ error: 'The request expired or is not valid. Connect your wallet again.', codigo: 'desafio' });
       }
       const ok = await verifyMessage({ address: d.direccion, message: d.mensaje, signature: firma }).catch(() => false);
-      if (!ok) return res.status(401).json({ error: 'La firma no corresponde a esa billetera.', codigo: 'firma' });
+      if (!ok) return res.status(401).json({ error: 'The signature does not match that wallet.', codigo: 'firma' });
       barrer(sesiones);
       const sesion = randomBytes(24).toString('hex');
       const expira = ahora() + ttlSesionMs;
@@ -316,7 +316,7 @@ export function createApp({
     if (!s) { sinSesion(res); return null; }
     const b = agent.store.getBooking(req.params.id);
     // Sin pista de si la reserva existe pero es de otra persona.
-    if (!b || !b.payer || b.payer.toLowerCase() !== s.direccion.toLowerCase()) { res.status(404).json({ error: 'No encontramos esa reserva en tu billetera.' }); return null; }
+    if (!b || !b.payer || b.payer.toLowerCase() !== s.direccion.toLowerCase()) { res.status(404).json({ error: 'We could not find that booking in your wallet.' }); return null; }
     return b;
   };
   app.post('/api/billetera/reservas/:id/cancelar-vista', (req, res) => {
@@ -348,7 +348,7 @@ export function createApp({
   // 3) Solo se llega acá con el pago verificado. La confirmación final la hace onAfterSettle.
   app.post('/api/reservas/:id/pagar', (req, res) => {
     const b = agent.store.getBooking(req.params.id);
-    res.json({ ok: true, mensaje: 'Seña pagada. Turno confirmado.', reserva: publicBooking(agent, { ...b, status: 'confirmed' }) });
+    res.json({ ok: true, mensaje: 'Deposit paid. Slot confirmed.', reserva: publicBooking(agent, { ...b, status: 'confirmed' }) });
   });
 
   // --- Página de pago para personas ------------------------------------------------
@@ -406,10 +406,10 @@ export function createApp({
   app.use((req, res) => res.status(404).json({ error: `No existe ${req.method} ${req.path}` }));
   // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => {
-    if (err.status === 400 || err.type === 'entity.parse.failed') return res.status(400).json({ error: 'El cuerpo del pedido no es un JSON válido.' });
-    if (err.status === 413) return res.status(413).json({ error: 'El pedido es demasiado grande.' });
+    if (err.status === 400 || err.type === 'entity.parse.failed') return res.status(400).json({ error: 'The request body is not valid JSON.' });
+    if (err.status === 413) return res.status(413).json({ error: 'The request is too large.' });
     logger.error?.(`[http] ${err.stack ?? err.message}`);
-    return res.status(500).json({ error: 'Error interno.' });
+    return res.status(500).json({ error: 'Internal error.' });
   });
   return app;
 }
@@ -420,8 +420,8 @@ export function buildRegistration({ agent, agentId, repoUrl, imageUrl }) {
   const reg = {
     type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
     name: `Seña · ${agent.business.nombre}`,
-    description: 'Agente que cobra señas en wARS por x402, aplica una política de cancelación y reubica turnos con lista de espera; reserva por Telegram, web o API.' +
-      (agent.business.esDemostracion ? ' Comercio de demostración: los turnos y precios son de ejemplo.' : ''),
+    description: 'Agent that charges deposits in wARS over x402, applies a cancellation policy and reassigns slots using a waitlist; booking via Telegram, web or API.' +
+      (agent.business.esDemostracion ? ' Demo venue: the slots and prices are examples.' : ''),
     services: [
       { name: 'web', endpoint: base },
       { name: 'x402', endpoint: `${base}/api/reservas/{id}/pagar`, version: '2' },

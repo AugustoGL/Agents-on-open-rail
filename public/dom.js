@@ -36,8 +36,8 @@ export function safeHref(href) {
 
 export const isTxHash = (tx) => typeof tx === 'string' && /^0x[a-fA-F0-9]{64}$/.test(tx);
 
-const DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
-const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const DIAS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MESES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "2026-10-22" -> "jue 22/10" */
 export function fmtDay(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -53,7 +53,7 @@ export function fmtDayLong(dateStr) {
 /** Fecha y hora en la zona del negocio (Argentina), a partir de un instante ISO. */
 export function fmtInstant(iso) {
   try {
-    return new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Cordoba', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
+    return new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Argentina/Cordoba', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
   } catch {
     return String(iso);
   }
@@ -90,13 +90,13 @@ export async function request(method, url, body, headers = {}) {
 
 // --- Piezas del sistema de diseño (public/css/sena.css) ---------------------------------------------------
 
-const DIAS_LARGOS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-const MESES_LARGOS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-/** "2026-10-29" -> "jueves 29 de octubre" */
+const DIAS_LARGOS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MESES_LARGOS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** "2026-10-29" -> "Thursday 29 October" */
 export function fmtFecha(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d, 12));
-  return `${DIAS_LARGOS[dt.getUTCDay()]} ${d} de ${MESES_LARGOS[m - 1]}`;
+  return `${DIAS_LARGOS[dt.getUTCDay()]} ${d} ${MESES_LARGOS[m - 1]}`;
 }
 /** "2026-10-29" -> { semana: "jue", numero: 29, mes: "oct" } */
 export function partesDia(dateStr) {
@@ -118,14 +118,14 @@ export function aviso(kind, ...content) {
 export function carteles(negocio, { modoPrueba } = {}) {
   const prueba = modoPrueba ?? negocio.modoPrueba;
   return [
-    negocio.esDemostracion ? h('div', { class: 'cartel cartel--demo', role: 'note' }, icono('alert'), h('div', {}, h('strong', {}, 'Comercio de demostración.'), ' Los turnos y los precios son de ejemplo.')) : null,
-    prueba ? h('div', { class: 'cartel cartel--prueba', role: 'note' }, icono('info'), h('div', {}, h('strong', {}, 'MODO PRUEBA.'), ' No se mueve plata de verdad.')) : null,
+    negocio.esDemostracion ? h('div', { class: 'cartel cartel--demo', role: 'note' }, icono('alert'), h('div', {}, h('strong', {}, 'Demo venue.'), ' The slots and prices are examples.')) : null,
+    prueba ? h('div', { class: 'cartel cartel--prueba', role: 'note' }, icono('info'), h('div', {}, h('strong', {}, 'TEST MODE.'), ' No real money moves.')) : null,
   ];
 }
 
 const ETIQUETAS = {
-  held: ['es-esperando', 'Esperando pago'], confirmed: ['es-confirmada', 'Confirmada'], cancelled: ['es-cancelada', 'Cancelada'],
-  expired: ['es-vencida', 'Vencida'], completed: ['es-jugada', 'Jugada'],
+  held: ['es-esperando', 'Awaiting payment'], confirmed: ['es-confirmada', 'Confirmed'], cancelled: ['es-cancelada', 'Cancelled'],
+  expired: ['es-vencida', 'Expired'], completed: ['es-jugada', 'Played'],
 };
 /** Etiqueta de estado de una reserva: mismo color e ícono en todas las pantallas. */
 export function estadoEtiqueta(estado) {
@@ -133,7 +133,7 @@ export function estadoEtiqueta(estado) {
   return h('span', { class: `estado ${clase}` }, texto);
 }
 
-export const cargando = (texto = 'Cargando…') => h('div', { class: 'cargando', role: 'status' }, h('div', { class: 'girando', 'aria-hidden': 'true' }), h('p', {}, texto));
+export const cargando = (texto = 'Loading…') => h('div', { class: 'cargando', role: 'status' }, h('div', { class: 'girando', 'aria-hidden': 'true' }), h('p', {}, texto));
 export const esqueletos = () => h('div', { class: 'pila--chica', 'aria-hidden': 'true' }, h('div', { class: 'esqueleto esqueleto--titulo' }), h('div', { class: 'esqueleto esqueleto--bloque' }), h('div', { class: 'esqueleto esqueleto--bloque' }));
 export function vacio({ icon = 'calendar', titulo, texto, accion }) {
   return h('div', { class: 'vacio' }, h('div', { class: 'vacio-icono' }, icono(icon)), h('h3', {}, titulo), texto ? h('p', {}, texto) : null, accion ?? null);
@@ -143,9 +143,9 @@ export function vacio({ icon = 'calendar', titulo, texto, accion }) {
 export function barraCliente({ activa } = {}) {
   return h('header', { class: 'barra' }, h('div', { class: 'barra-interior' },
     h('a', { class: 'marca', href: '/' }, h('span', { class: 'marca-logo' }, icono('check')), 'Seña'),
-    h('a', { class: 'nav-link solo-movil al-final', href: '/#mis-reservas' }, icono('list'), 'Mis reservas'),
-    h('nav', { class: 'nav-superior', 'aria-label': 'Principal' },
-      h('a', { class: 'nav-link', href: '/', ...(activa === 'reservar' ? { 'aria-current': 'page' } : {}) }, icono('calendar'), 'Reservar'),
-      h('a', { class: 'nav-link', href: '/#mis-reservas' }, icono('list'), 'Mis reservas'),
-      h('a', { class: 'nav-link', href: '/decisiones' }, icono('doc'), 'Qué decide el agente'))));
+    h('a', { class: 'nav-link solo-movil al-final', href: '/#mis-reservas' }, icono('list'), 'My bookings'),
+    h('nav', { class: 'nav-superior', 'aria-label': 'Main' },
+      h('a', { class: 'nav-link', href: '/', ...(activa === 'reservar' ? { 'aria-current': 'page' } : {}) }, icono('calendar'), 'Book'),
+      h('a', { class: 'nav-link', href: '/#mis-reservas' }, icono('list'), 'My bookings'),
+      h('a', { class: 'nav-link', href: '/decisiones' }, icono('doc'), 'What the agent decides'))));
 }

@@ -51,14 +51,14 @@ const real = await levantar('real');
 const hoy = localDateStr(Date.now(), prueba.agent.offset);
 const token = `api:${hex(16)}`;
 const yo = { id: token, name: 'Marta', channel: 'web' };
-const hacer = (off, hora, recurso = 'Cancha 1', hold) => prueba.agent.reserve({ resource: recurso, startAt: prueba.agent.listSlots({ dateStr: addDays(hoy, off) }).find((s) => s.time === hora && s.resource === recurso).startAt, customer: yo, holdMinutes: hold }).booking;
+const hacer = (off, hora, recurso = 'Court 1', hold) => prueba.agent.reserve({ resource: recurso, startAt: prueba.agent.listSlots({ dateStr: addDays(hoy, off) }).find((s) => s.time === hora && s.resource === recurso).startAt, customer: yo, holdMinutes: hold }).booking;
 const pagarFalso = async (b, payer = `0x${hex(20)}`) => { prueba.chain.credit(b.deposit_wei); await prueba.agent.onPaymentSettled({ bookingId: b.id, payer, tx: `0x${hex(32)}`, amountWei: b.deposit_wei }); };
 // Una billetera de prueba que firma de verdad, con reservas pagadas desde ella (para "Ver mis reservas con mi billetera").
 const firmante = privateKeyToAccount(generatePrivateKey());
-const confirmada = hacer(3, '20:00', 'Cancha 2'); await pagarFalso(confirmada);
-const sinPagar = hacer(3, '21:30', 'Cancha 1');
-const pasada = hacer(3, '12:00', 'Cancha 1'); await pagarFalso(pasada); await prueba.agent.cancel({ bookingId: pasada.id, customerId: token });
-const vencida = hacer(3, '17:00', 'Cancha 2', -1);
+const confirmada = hacer(3, '20:00', 'Court 2'); await pagarFalso(confirmada);
+const sinPagar = hacer(3, '21:30', 'Court 1');
+const pasada = hacer(3, '12:00', 'Court 1'); await pagarFalso(pasada); await prueba.agent.cancel({ bookingId: pasada.id, customerId: token });
+const vencida = hacer(3, '17:00', 'Court 2', -1);
 await prueba.agent.expireHolds(); // la reserva ya vencida pasa a "vencida" y deja de contar como pendiente
 /** Una reserva nueva esperando el pago (de otra persona, para no pasar el límite de pendientes por cliente). */
 let contador = 0;
@@ -74,7 +74,7 @@ prueba.nft.bloqueados.add(String(tokenIdFor(nftEnviando.id))); prueba.nft.bloque
 await pagarFalso(nftEnviando); await pagarFalso(nftError);
 for (let i = 0; i < 6; i++) await prueba.agent.processNft(); // los dos agotan los intentos...
 prueba.agent.store.updateBooking(nftEnviando.id, { nft_attempts: 1, nft_error: null }, Date.now()); // ...y uno vuelve a "enviando"
-prueba.agent.joinWaitlist({ resource: 'Cancha 2', startAt: prueba.agent.listSlots({ dateStr: addDays(hoy, 1) }).find((s) => s.time === '20:00' && s.resource === 'Cancha 2').startAt, customer: yo });
+prueba.agent.joinWaitlist({ resource: 'Court 2', startAt: prueba.agent.listSlots({ dateStr: addDays(hoy, 1) }).find((s) => s.time === '20:00' && s.resource === 'Court 2').startAt, customer: yo });
 const idEnEspera = sinPagar.id;
 
 // --- Billetera simulada --------------------------------------------------------------------------------------------
@@ -170,7 +170,7 @@ for (const v of VISTAS) {
   await pantalla(v, '05-mis-reservas', P, { antes: async (pg) => { await pg.goto(`${P.base}/`); await pg.waitFor('document.querySelector("#mis .tarjeta")', 'mis reservas'); await pg.evaluate('document.querySelector("#mis-reservas").scrollIntoView()'); } });
   await pantalla(v, '06-cancelar-con-vista-previa', P, { antes: async (pg) => {
     await pg.goto(`${P.base}/`); await pg.waitFor('document.querySelector("#mis .tarjeta")', 'mis reservas');
-    await pg.evaluate('[...document.querySelectorAll("#mis button")].find((b) => b.textContent.trim() === "Cancelar").click()'); await pg.sleep(700);
+    await pg.evaluate('[...document.querySelectorAll("#mis button")].find((b) => b.textContent.trim() === "Cancel").click()'); await pg.sleep(700);
     await pg.evaluate('document.querySelector("#mis-reservas").scrollIntoView()');
   } });
   const conFirmante = async (pg) => { await instalarBilleteraFirmante(pg, firmante); };
@@ -178,34 +178,34 @@ for (const v of VISTAS) {
   await pantalla(v, '05b-mis-reservas-conectar-billetera', P, { preparar: conFirmante, antes: async (pg) => { await irAMias(pg); await pg.evaluate('document.querySelector("#mis-reservas").scrollIntoView()'); } });
   await pantalla(v, '05c-mis-reservas-con-billetera', P, { preparar: conFirmante, antes: async (pg) => {
     await irAMias(pg); await pg.evaluate('document.querySelector("#conectar-billetera").click()');
-    await pg.waitFor(`document.body.innerText.includes('Billetera conectada')`, 'billetera conectada');
+    await pg.waitFor(`document.body.innerText.includes('Wallet connected')`, 'billetera conectada');
     await pg.waitFor(`document.querySelectorAll('#mis .tarjeta').length >= 3`, 'reservas de la billetera'); await pg.evaluate('document.querySelector("#mis-reservas").scrollIntoView()');
   } });
   await pantalla(v, '05d-billetera-cancelar-vista-previa', P, { preparar: conFirmante, antes: async (pg) => {
     await irAMias(pg); await pg.evaluate('document.querySelector("#conectar-billetera").click()');
-    await pg.waitFor(`document.body.innerText.includes('Billetera conectada')`, 'billetera conectada');
-    const cancelarDeConfirmada = `[...document.querySelectorAll('#mis .tarjeta')].filter((c) => /Confirmada/.test(c.textContent)).map((c) => [...c.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Cancelar')).find(Boolean)`;
+    await pg.waitFor(`document.body.innerText.includes('Wallet connected')`, 'billetera conectada');
+    const cancelarDeConfirmada = `[...document.querySelectorAll('#mis .tarjeta')].filter((c) => /Confirmed/.test(c.textContent)).map((c) => [...c.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Cancel')).find(Boolean)`;
     await pg.waitFor(cancelarDeConfirmada, 'botón cancelar de una reserva confirmada');
     await pg.evaluate(`(${cancelarDeConfirmada}).click()`);
-    await pg.waitFor(`document.body.innerText.includes('Si cancelás ahora')`, 'vista previa'); await pg.evaluate('document.querySelector("#mis-reservas").scrollIntoView()');
+    await pg.waitFor(`document.body.innerText.includes('If you cancel now')`, 'vista previa'); await pg.evaluate('document.querySelector("#mis-reservas").scrollIntoView()');
   } });
   await pantalla(v, '07-pago-sin-billetera', P, { antes: ir(`/pagar/${aPagar.id}`), esperar: 'document.querySelector(".cuenta")' });
   await pantalla(v, '08-pago-billetera-red-equivocada', P, { preparar: async (pg) => { await pg.cmd('Page.addScriptToEvaluateOnNewDocument', { source: billetera({ red: '0x1' }) }); await simularRpc(pg, 0n); },
-    antes: async (pg, srv) => { await pg.goto(`${srv.base}/pagar/${aPagar.id}`); await pg.waitFor('document.querySelector(".cuenta")', 'pago'); await clicTexto(pg, 'Conectar mi billetera'); await pg.waitFor(`document.body.innerText.includes('otra red')`, 'aviso de red'); } });
+    antes: async (pg, srv) => { await pg.goto(`${srv.base}/pagar/${aPagar.id}`); await pg.waitFor('document.querySelector(".cuenta")', 'pago'); await clicTexto(pg, 'Connect my wallet'); await pg.waitFor(`document.body.innerText.includes('another network')`, 'aviso de red'); } });
   await pantalla(v, '09-pago-sin-saldo', real, { preparar: async (pg) => { await pg.cmd('Page.addScriptToEvaluateOnNewDocument', { source: billetera({}) }); await simularRpc(pg, 1_500n * 10n ** 18n); },
-    antes: async (pg, srv) => { await pg.goto(`${srv.base}/pagar/${aPagar.id}`); await pg.waitFor('document.querySelector(".cuenta")', 'pago'); await clicTexto(pg, 'Conectar mi billetera'); await pg.waitFor(`document.body.innerText.includes('No te alcanza el saldo')`, 'aviso de saldo'); } });
+    antes: async (pg, srv) => { await pg.goto(`${srv.base}/pagar/${aPagar.id}`); await pg.waitFor('document.querySelector(".cuenta")', 'pago'); await clicTexto(pg, 'Connect my wallet'); await pg.waitFor(`document.body.innerText.includes('Your balance is not enough')`, 'aviso de saldo'); } });
   await pantalla(v, '09b-pago-firma-rechazada', P, { preparar: async (pg) => { await pg.cmd('Page.addScriptToEvaluateOnNewDocument', { source: billetera({}) }); await simularRpc(pg, 50_000n * 10n ** 18n); },
-    antes: async (pg, srv) => { await pg.goto(`${srv.base}/pagar/${aPagar.id}`); await pg.waitFor('document.querySelector(".cuenta")', 'pago'); await clicTexto(pg, 'Conectar mi billetera'); await pg.waitFor(`document.body.innerText.includes('Pagar $')`, 'botón pagar'); await clicTexto(pg, 'Pagar $'); await pg.waitFor(`document.body.innerText.includes('No aceptaste en tu billetera')`, 'firma rechazada'); } });
-  await pantalla(v, '10-pago-confirmado', P, { antes: ir(`/pagar/${confirmada.id}`), esperar: `document.body.innerText.includes('quedó confirmado')` });
-  await pantalla(v, '10d-pago-ticket-enviando', P, { antes: async (pg, srv) => { prueba.agent.store.updateBooking(nftEnviando.id, { nft_attempts: 1, nft_error: null }, Date.now()); await pg.goto(`${srv.base}/pagar/${nftEnviando.id}`); }, esperar: `document.body.innerText.includes('Estamos mandando el ticket')` });
-  await pantalla(v, '10e-pago-ticket-con-error', P, { antes: ir(`/pagar/${nftError.id}`), esperar: `document.body.innerText.includes('todavía no salió')` });
-  await pantalla(v, '10b-pago-vencida', P, { antes: ir(`/pagar/${vencida.id}`), esperar: `document.body.innerText.includes('Se venció')` });
-  await pantalla(v, '10c-pago-no-existe', P, { antes: ir('/pagar/S-ZZZZZZ'), esperar: `document.body.innerText.includes('No encontramos')` });
+    antes: async (pg, srv) => { await pg.goto(`${srv.base}/pagar/${aPagar.id}`); await pg.waitFor('document.querySelector(".cuenta")', 'pago'); await clicTexto(pg, 'Connect my wallet'); await pg.waitFor(`document.body.innerText.includes('Pay $')`, 'botón pagar'); await clicTexto(pg, 'Pay $'); await pg.waitFor(`document.body.innerText.includes('You did not approve in your wallet')`, 'firma rechazada'); } });
+  await pantalla(v, '10-pago-confirmado', P, { antes: ir(`/pagar/${confirmada.id}`), esperar: `document.body.innerText.includes('is confirmed')` });
+  await pantalla(v, '10d-pago-ticket-enviando', P, { antes: async (pg, srv) => { prueba.agent.store.updateBooking(nftEnviando.id, { nft_attempts: 1, nft_error: null }, Date.now()); await pg.goto(`${srv.base}/pagar/${nftEnviando.id}`); }, esperar: `document.body.innerText.includes('We are sending the ticket')` });
+  await pantalla(v, '10e-pago-ticket-con-error', P, { antes: ir(`/pagar/${nftError.id}`), esperar: `document.body.innerText.includes('has not gone out yet')` });
+  await pantalla(v, '10b-pago-vencida', P, { antes: ir(`/pagar/${vencida.id}`), esperar: `document.body.innerText.includes('has run out')` });
+  await pantalla(v, '10c-pago-no-existe', P, { antes: ir('/pagar/S-ZZZZZZ'), esperar: `document.body.innerText.includes('We could not find')` });
   await pantalla(v, '11-pago-en-proceso', P, { preparar: async (pg) => { await pg.cmd('Page.addScriptToEvaluateOnNewDocument', { source: billetera({}) }); await simularRpc(pg, 50_000n * 10n ** 18n); await pg.cmd('Page.addScriptToEvaluateOnNewDocument', { source: `window.__lento = true;` }); },
     antes: async (pg, srv) => { await pg.goto(`${srv.base}/pagar/${aPagar.id}`); await pg.waitFor('document.querySelector(".cuenta")', 'pago'); await pg.evaluate(`document.querySelector('#pago-prueba').click()`); await pg.sleep(30); } });
   aPagar = pendienteNueva();
   await pantalla(v, '12-decisiones', P, { antes: ir('/decisiones'), esperar: 'document.querySelectorAll(".decision").length > 3', maxHeight: 4200 });
-  await pantalla(v, '13-decisiones-cancelaciones', P, { antes: async (pg, srv) => { await pg.goto(`${srv.base}/decisiones`); await pg.waitFor('document.querySelectorAll(".decision").length > 3', 'decisiones'); await clicTexto(pg, 'Cancelaciones'); await pg.sleep(300); }, maxHeight: 3200 });
+  await pantalla(v, '13-decisiones-cancelaciones', P, { antes: async (pg, srv) => { await pg.goto(`${srv.base}/decisiones`); await pg.waitFor('document.querySelectorAll(".decision").length > 3', 'decisiones'); await clicTexto(pg, 'Cancellations'); await pg.sleep(300); }, maxHeight: 3200 });
 
   // ===== Panel =====
   const panel = (ruta, esperar, extra) => async (pg, srv) => {
@@ -221,9 +221,9 @@ for (const v of VISTAS) {
   await pantalla(v, '21-panel-hoy', P, { antes: panel('hoy', 'document.querySelector(".dato-valor") && document.querySelector(".decision")') });
   await pantalla(v, '22-panel-hoy-menu-mas', P, { antes: panel('hoy', 'document.querySelector(".dato-valor")', async (pg) => { await pg.evaluate('document.querySelector("#boton-mas").click()'); await pg.sleep(300); }) });
   await pantalla(v, '23-panel-calendario-dia', P, { antes: panel('calendario', 'document.querySelector(".cal-celda")') });
-  await pantalla(v, '24-panel-calendario', P, { antes: panel('calendario', 'document.querySelector(".cal-celda")', async (pg) => { await clicTexto(pg, 'Semana'); await pg.waitFor('document.querySelector("table.cal-semana")', 'semana'); }) });
+  await pantalla(v, '24-panel-calendario', P, { antes: panel('calendario', 'document.querySelector(".cal-celda")', async (pg) => { await clicTexto(pg, 'Week'); await pg.waitFor('document.querySelector("table.cal-semana")', 'semana'); }) });
   await pantalla(v, '25-panel-reservas', P, { antes: panel('reservas', 'document.querySelector(".fila-lista")') });
-  await pantalla(v, '26-panel-reserva-detalle', P, { antes: panel('reservas', 'document.querySelector(".fila-lista")', async (pg) => { await pg.evaluate('[...document.querySelectorAll(".fila-lista")].find((b) => /Confirmada/.test(b.textContent)).click()'); await pg.waitFor('document.querySelector(".modal")', 'detalle'); }) });
+  await pantalla(v, '26-panel-reserva-detalle', P, { antes: panel('reservas', 'document.querySelector(".fila-lista")', async (pg) => { await pg.evaluate('[...document.querySelectorAll(".fila-lista")].find((b) => /Confirmed/.test(b.textContent)).click()'); await pg.waitFor('document.querySelector(".modal")', 'detalle'); }) });
   await pantalla(v, '27-panel-pendientes', P, { antes: panel('pendientes', 'document.querySelector("section.tarjeta")') });
   await pantalla(v, '28-panel-bloqueos', P, { antes: panel('bloqueos', 'document.querySelector("form")') , maxHeight: 4200 });
   await pantalla(v, '29-panel-decisiones', P, { antes: panel('decisiones', 'document.querySelector(".decision")'), maxHeight: 4200 });

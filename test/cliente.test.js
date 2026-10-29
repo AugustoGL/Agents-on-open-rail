@@ -19,7 +19,7 @@ before(async () => {
 after(() => new Promise((resolve) => server.close(resolve)));
 
 const post = async (path, body) => { const r = await fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) }); return { status: r.status, body: await r.json() }; };
-const reservar = (hora, fecha = '2026-10-21', recurso = 'Cancha 1') => post('/api/reservas', { recurso, fecha, hora, cliente: { nombre: 'Marta', canal: 'web' } });
+const reservar = (hora, fecha = '2026-10-21', recurso = 'Court 1') => post('/api/reservas', { recurso, fecha, hora, cliente: { nombre: 'Marta', canal: 'web' } });
 
 test('/api/negocio trae lo que necesita la pantalla: hoy, modo prueba, tiempos y política', async () => {
   const n = await (await fetch(`${base}/api/negocio`)).json();
@@ -69,7 +69,7 @@ test('el Date del servidor llega a la página (la cuenta regresiva usa la hora d
 });
 
 test('las páginas del cliente usan el sistema de diseño y la política de seguridad estricta', async () => {
-  for (const [path, re] of [['/', /Reservá tu turno/], ['/pagar/S-AAAAAA', /Pagá la seña/]]) {
+  for (const [path, re] of [['/', /Book your slot/], ['/pagar/S-AAAAAA', /Pay the deposit/]]) {
     const res = await fetch(base + path);
     assert.equal(res.status, 200, path);
     const html = await res.text();

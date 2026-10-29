@@ -1,7 +1,7 @@
 // Horas locales del negocio. Argentina usa UTC-3 todo el año (sin horario de verano),
 // así que alcanza con un desfase fijo que se configura en config/negocio.json.
 
-const DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const DIAS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const pad = (n) => String(n).padStart(2, '0');
 
 /** Fecha y hora local ("2026-10-22", "21:30") -> milisegundos UTC. */

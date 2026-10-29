@@ -27,14 +27,14 @@ after(() => new Promise((resolve) => httpServer.close(resolve)));
 
 const post = (path, body, headers = {}) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body ?? {}) });
 
-async function reserve(hora = '20:00', fecha = '2026-10-21', recurso = 'Cancha 1') {
+async function reserve(hora = '20:00', fecha = '2026-10-21', recurso = 'Court 1') {
   const res = await post('/api/reservas', { recurso, fecha, hora, cliente: { nombre: 'Agente de prueba' } });
   return { status: res.status, body: await res.json() };
 }
 
 test('info del negocio y turnos libres', async () => {
   const info = await (await fetch(`${base}/api/negocio`)).json();
-  assert.equal(info.sena, '$ 6.000');
+  assert.equal(info.sena, '$ 6,000');
   assert.equal(info.moneda.direccion, WARS.address);
   const turnos = await (await fetch(`${base}/api/turnos?fecha=2026-10-21`)).json();
   assert.equal(turnos.turnos.length, 14);

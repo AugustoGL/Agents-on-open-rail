@@ -30,3 +30,16 @@ venv/
 .vscode/
 .idea/
 .DS_Store
+
+# Video de referencia (solo para analizar el estilo; no se sube)
+video/*.mp4
+video/*.mov
+video/*.wav
+video/_analisis/
+
+# Salidas del render del video (se regeneran con `npm run video`)
+video/out/
+
+# Instaladores y paquetes sueltos
+*.deb
+*.zip

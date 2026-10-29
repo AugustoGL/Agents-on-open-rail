@@ -1,31 +1,31 @@
 <!doctype html>
-<html lang="es-AR">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#F6F3EC" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#141411" media="(prefers-color-scheme: dark)">
-  <title>Pagá la seña · Seña</title>
+  <title>Pay the deposit · Seña</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/css/sena.css">
 </head>
 <body>
-  <a class="saltar" href="#contenido">Saltar al contenido</a>
+  <a class="saltar" href="#contenido">Skip to content</a>
   <div id="carteles"></div>
   <div id="barra"></div>
   <main id="contenido" class="contenedor pila--grande">
-    <noscript><div class="aviso aviso-error"><div>Para pagar necesitás activar JavaScript en el navegador.</div></div></noscript>
+    <noscript><div class="aviso aviso-error"><div>To pay you need to turn on JavaScript in your browser.</div></div></noscript>
     <section class="pila--grande" aria-labelledby="titulo">
       <div class="pila--chica">
-        <h1 id="titulo" tabindex="-1">Pagá la seña</h1>
-        <p id="subtitulo" class="apagado">Es el último paso para confirmar tu turno.</p>
+        <h1 id="titulo" tabindex="-1">Pay the deposit</h1>
+        <p id="subtitulo" class="apagado">This is the last step to confirm your slot.</p>
       </div>
-      <ol class="pasos" id="pasos" aria-label="Pasos de la reserva">
-        <li data-hecho>Turno</li><li data-hecho>Tus datos</li><li aria-current="step">Pagar</li><li>Listo</li>
+      <ol class="pasos" id="pasos" aria-label="Booking steps">
+        <li data-hecho>Slot</li><li data-hecho>Your details</li><li aria-current="step">Pay</li><li>Done</li>
       </ol>
     </section>
     <div id="vista" class="pila--grande" aria-live="polite">
-      <div class="cargando" role="status"><div class="girando" aria-hidden="true"></div><p>Cargando tu reserva…</p></div>
+      <div class="cargando" role="status"><div class="girando" aria-hidden="true"></div><p>Loading your booking…</p></div>
     </div>
   </main>
   <script type="module" src="/static/pay.bundle.js"></script>

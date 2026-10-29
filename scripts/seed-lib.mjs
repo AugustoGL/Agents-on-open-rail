@@ -64,12 +64,12 @@ export async function sembrar({ store, hoyMs = Date.now(), payoutAddress = '0x00
 
   // 1. Un turno jugado (estado "jugada").
   at(T(-6, '10:00'));
-  const b1 = reservar('marta', 'Cancha 1', -5, '20:00');
+  const b1 = reservar('marta', 'Court 1', -5, '20:00');
   at(T(-6, '10:06')); await pagar('marta', b1);
 
   // 2. Cancelación a tiempo: devuelve toda la seña.
   at(T(-6, '11:00'));
-  const b2 = reservar('beto', 'Cancha 2', -5, '18:30');
+  const b2 = reservar('beto', 'Court 2', -5, '18:30');
   at(T(-6, '11:04')); await pagar('beto', b2);
   at(T(-6, '15:30')); await cancelar('beto', b2);
 
@@ -79,29 +79,29 @@ export async function sembrar({ store, hoyMs = Date.now(), payoutAddress = '0x00
 
   // 4. Reservas que van a terminar en cancelación tardía, reventa y lista de espera (se resuelven en orden de reloj, abajo).
   at(T(-5, '09:00'));
-  const b3 = reservar('luli', 'Cancha 1', -3, '21:30');
+  const b3 = reservar('luli', 'Court 1', -3, '21:30');
   at(T(-5, '09:05')); await pagar('luli', b3);
   at(T(-4, '10:00'));
-  agent.joinWaitlist({ resource: 'Cancha 1', startAt: T(-3, '21:30'), customer: { ...personas.nico } });
+  agent.joinWaitlist({ resource: 'Court 1', startAt: T(-3, '21:30'), customer: { ...personas.nico } });
   at(T(-4, '12:00'));
-  const b4 = reservar('ceci', 'Cancha 2', -2, '12:00');
+  const b4 = reservar('ceci', 'Court 2', -2, '12:00');
   at(T(-4, '12:03')); await pagar('ceci', b4);
 
   // 5. Una reserva que nadie paga: se libera sola.
   at(T(-3, '16:00'));
-  reservar('fede', 'Cancha 1', -2, '17:00');
+  reservar('fede', 'Court 1', -2, '17:00');
   at(T(-3, '16:20')); await agent.expireHolds();
 
   // 6. Cancelación muy tardía de Luli (2,5 h antes): la seña queda, se le ofrece el turno a Nico, Nico paga y a Luli se le devuelve.
   at(T(-3, '19:00')); await cancelar('luli', b3);
-  const oferta = store.activeBookingForSlot('Cancha 1', T(-3, '21:30'));
+  const oferta = store.activeBookingForSlot('Court 1', T(-3, '21:30'));
   at(T(-3, '19:12')); await pagar('nico', oferta);
   // Cancelación tardía parcial de Ceci (15 h antes): devuelve el 50 %.
   at(T(-3, '21:00')); await cancelar('ceci', b4);
 
   // 7. Otra jugada, y cierre del día con retiro.
   at(T(-2, '11:00'));
-  const b5 = reservar('sofi', 'Cancha 2', -1, '20:00');
+  const b5 = reservar('sofi', 'Court 2', -1, '20:00');
   at(T(-2, '11:02')); await pagar('sofi', b5);
   at(T(-1, '23:00')); agent.completeFinished();
   await agent.dailyClose({ dateStr: addDays(today, -1) });
@@ -115,7 +115,7 @@ export async function sembrar({ store, hoyMs = Date.now(), payoutAddress = '0x00
   // 9. Devoluciones grandes: esperan al dueño; una se aprueba, otra se rechaza y otra queda pendiente.
   at(T(0, '08:00'));
   const grandes = [];
-  for (const [quien, cancha, hora] of [['juani', 'Cancha 1', '09:00'], ['pablo', 'Cancha 2', '09:00'], ['lara', 'Cancha 1', '10:30']]) {
+  for (const [quien, cancha, hora] of [['juani', 'Court 1', '09:00'], ['pablo', 'Court 2', '09:00'], ['lara', 'Court 1', '10:30']]) {
     const b = reservar(quien, cancha, 3, hora);
     at(now + 120_000); await pagar(quien, b); grandes.push([quien, b]);
   }
@@ -129,23 +129,23 @@ export async function sembrar({ store, hoyMs = Date.now(), payoutAddress = '0x00
   // 10. Reservas de los próximos días en distintos estados + bloqueos.
   at(T(0, '08:30'));
   const futuras = [
-    ['tomas', 'Cancha 1', 2, '20:00', true], ['gus', 'Cancha 2', 1, '20:00', true], ['marta', 'Cancha 1', 1, '18:30', true],
-    ['vale', 'Cancha 2', 4, '21:30', true], ['ana', 'Cancha 1', 5, '17:00', true], ['beto', 'Cancha 2', 2, '18:30', true],
+    ['tomas', 'Court 1', 2, '20:00', true], ['gus', 'Court 2', 1, '20:00', true], ['marta', 'Court 1', 1, '18:30', true],
+    ['vale', 'Court 2', 4, '21:30', true], ['ana', 'Court 1', 5, '17:00', true], ['beto', 'Court 2', 2, '18:30', true],
   ];
   for (const [quien, cancha, off, hora] of futuras) { const b = reservar(quien, cancha, off, hora); at(now + 90_000); await pagar(quien, b); crear[`${quien}-${off}`] = b; }
   // Dos que esperan el pago (con tiempo de sobra) y una persona en lista de espera.
   at(Math.max(now, hoyMs - 3 * 60_000));
-  const sinPagar = [['luli', 'Cancha 2', 1, '21:30'], ['fede', 'Cancha 1', 1, '20:00']];
+  const sinPagar = [['luli', 'Court 2', 1, '21:30'], ['fede', 'Court 1', 1, '20:00']];
   for (const [quien, cancha, off, hora] of sinPagar) reservar(quien, cancha, off, hora);
-  agent.joinWaitlist({ resource: 'Cancha 1', startAt: T(1, '18:30'), customer: { ...personas.lara } });
+  agent.joinWaitlist({ resource: 'Court 1', startAt: T(1, '18:30'), customer: { ...personas.lara } });
 
   // Bloqueos: uno con una reserva pagada adentro que el dueño canceló (devolución total), uno vigente con aviso y dos vacíos.
   at(Math.max(now, hoyMs - 2 * 60_000));
-  const feriado = agent.createBlock({ tipo: 'dia', fecha: addDays(today, 2), motivo: 'Feriado' }, { ip: '127.0.0.1' });
+  const feriado = agent.createBlock({ tipo: 'dia', fecha: addDays(today, 2), motivo: 'Public holiday' }, { ip: '127.0.0.1' });
   await agent.cancelBlockedBookings(feriado.block.id);
-  agent.createBlock({ tipo: 'dia', fecha: addDays(today, 4), motivo: 'Torneo del club' }, { ip: '127.0.0.1' }); // deja una reserva pagada adentro: el panel avisa
-  agent.createBlock({ tipo: 'recurso', recurso: 'Cancha 2', fecha: addDays(today, 5), hasta: addDays(today, 6), motivo: 'Mantenimiento' }, { ip: '127.0.0.1' });
-  agent.createBlock({ tipo: 'turno', recurso: 'Cancha 1', fecha: addDays(today, 1), hora: '12:00', motivo: 'Clase de pádel' }, { ip: '127.0.0.1' });
+  agent.createBlock({ tipo: 'dia', fecha: addDays(today, 4), motivo: 'Club tournament' }, { ip: '127.0.0.1' }); // deja una reserva pagada adentro: el panel avisa
+  agent.createBlock({ tipo: 'recurso', recurso: 'Court 2', fecha: addDays(today, 5), hasta: addDays(today, 6), motivo: 'Maintenance' }, { ip: '127.0.0.1' });
+  agent.createBlock({ tipo: 'turno', recurso: 'Court 1', fecha: addDays(today, 1), hora: '12:00', motivo: 'Padel class' }, { ip: '127.0.0.1' });
 
   now = hoyMs;
   return {

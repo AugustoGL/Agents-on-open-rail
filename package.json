@@ -26,7 +26,8 @@
     "nft:compile": "node scripts/nft-compile.mjs",
     "nft:deploy": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/nft-deploy.mjs",
     "nft:probar": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/nft-probar.mjs",
-    "nft:clave": "node scripts/nft-clave.mjs"
+    "nft:clave": "node scripts/nft-clave.mjs",
+    "video": "node --disable-warning=ExperimentalWarning video/render/render.mjs full"
   },
   "dependencies": {
     "@celo/attribution-tags": "0.5.0",

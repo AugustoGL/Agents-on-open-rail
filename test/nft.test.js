@@ -40,21 +40,21 @@ test('el id del ticket sale del código de la reserva', () => {
 });
 
 test('la imagen del ticket escapa lo que viene del comercio y cambia con el estado', () => {
-  const svg = ticketSvg({ negocio: '<script>alert(1)</script> & "Club"', recurso: "Cancha <b>1</b>", cuando: 'jue 29/10 20:00', sena: '$ 6.000', codigo: 'S-ABC123' });
+  const svg = ticketSvg({ negocio: '<script>alert(1)</script> & "Club"', recurso: "Cancha <b>1</b>", cuando: 'jue 29/10 20:00', sena: '$ 6,000', codigo: 'S-ABC123' });
   assert.ok(!/<script|<b>/.test(svg));
   assert.match(svg, /&lt;script&gt;/);
-  assert.match(svg, /CONFIRMADA/);
-  assert.match(ticketSvg({ negocio: 'x', recurso: 'y', cuando: 'z', sena: '$ 1', codigo: 'S-1', estado: 'jugada' }), /JUGADA/);
+  assert.match(svg, /CONFIRMED/);
+  assert.match(ticketSvg({ negocio: 'x', recurso: 'y', cuando: 'z', sena: '$ 1', codigo: 'S-1', estado: 'jugada' }), /PLAYED/);
   assert.ok(svg.length < 2000, `el SVG pesa ${svg.length} bytes (más chico = menos gas)`);
 });
 
 test('los datos del ticket tienen el formato estándar y no llevan datos personales', () => {
-  const m = ticketMetadata({ negocio: 'Pádel Demo', recurso: 'Cancha 1', cuando: 'jue 29/10 20:00', inicioMs: Date.UTC(2026, 9, 29, 23), sena: '$ 6.000', codigo: 'S-ABC123', urlBase: 'https://sena.example/' });
-  assert.equal(m.name, 'Reserva S-ABC123 · Cancha 1');
+  const m = ticketMetadata({ negocio: 'Pádel Demo', recurso: 'Court 1', cuando: 'jue 29/10 20:00', inicioMs: Date.UTC(2026, 9, 29, 23), sena: '$ 6,000', codigo: 'S-ABC123', urlBase: 'https://sena.example/' });
+  assert.equal(m.name, 'Booking S-ABC123 · Court 1');
   assert.match(m.image, /^data:image\/svg\+xml;base64,/);
   assert.equal(m.external_url, 'https://sena.example/pagar/S-ABC123');
-  assert.deepEqual(m.attributes.map((a) => a.trait_type), ['Comercio', 'Cancha', 'Turno', 'Inicio', 'Seña', 'Estado']);
-  assert.equal(m.attributes.find((a) => a.trait_type === 'Inicio').value, Math.floor(Date.UTC(2026, 9, 29, 23) / 1000));
+  assert.deepEqual(m.attributes.map((a) => a.trait_type), ['Venue', 'Court', 'Slot', 'Start', 'Deposit', 'Status']);
+  assert.equal(m.attributes.find((a) => a.trait_type === 'Start').value, Math.floor(Date.UTC(2026, 9, 29, 23) / 1000));
   const uri = tokenUri(m);
   assert.deepEqual(leer(uri), m);
 });
@@ -71,20 +71,20 @@ test('el contrato compilado coincide con su código fuente y tiene lo que usa el
 
 test('al pagar se le manda el ticket a la billetera que pagó, una sola vez', async () => {
   const ctx = conNft();
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: WED_20, customer: alice });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice });
   const r = await pagar(ctx, booking);
   assert.equal(r.kind, 'confirmado');
   const id = tokenIdFor(booking.id);
   const t = ctx.nft.tokens.get(String(id));
   assert.equal(t.to, PAYER_A);
-  assert.equal(leer(t.uri).name, `Reserva ${booking.id} · Cancha 1`);
+  assert.equal(leer(t.uri).name, `Booking ${booking.id} · Court 1`);
   const row = ctx.store.getBooking(booking.id);
   assert.equal(row.nft_state, 'minted');
   assert.equal(row.nft_action, null);
   assert.match(row.nft_tx, /^0x[0-9a-f]{64}$/);
   assert.equal(row.nft_token_id, String(id));
   assert.ok(ctx.store.decisions({ bookingId: booking.id }).some((d) => d.rule === 'NFT_ENVIADO' && d.tx === row.nft_tx));
-  assert.ok(ctx.notifier.forCustomer(alice.id).some((m) => /ya está en tu billetera como NFT/.test(m.text)));
+  assert.ok(ctx.notifier.forCustomer(alice.id).some((m) => /is now in your wallet as an NFT/.test(m.text)));
   const info = ctx.agent.nftInfo(row);
   assert.equal(info.estado, 'enviado');
   assert.equal(info.billetera, PAYER_A);
@@ -98,7 +98,7 @@ test('al pagar se le manda el ticket a la billetera que pagó, una sola vez', as
 
 test('el ticket va a la billetera elegida si no es la que pagó (nft_to)', async () => {
   const ctx = conNft();
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: WED_20, customer: alice });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice });
   ctx.store.updateBooking(booking.id, { nft_to: PAYER_B }, ctx.agent.now());
   await pagar(ctx, booking, PAYER_A);
   assert.equal(ctx.nft.tokens.get(String(tokenIdFor(booking.id))).to, PAYER_B);
@@ -107,7 +107,7 @@ test('el ticket va a la billetera elegida si no es la que pagó (nft_to)', async
 
 test('cancelar quema el ticket; no queda nada en la billetera', async () => {
   const ctx = conNft();
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: WED_20, customer: alice });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice });
   await pagar(ctx, booking);
   const r = await ctx.agent.cancel({ bookingId: booking.id, customerId: alice.id });
   assert.ok(r.ok);
@@ -122,13 +122,13 @@ test('cancelar quema el ticket; no queda nada en la billetera', async () => {
 
 test('cuando se juega el turno, el ticket pasa a "jugada" y queda de recuerdo', async () => {
   const ctx = conNft();
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: WED_20, customer: alice });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice });
   await pagar(ctx, booking);
   ctx.clock.set(WED_20 + 3 * HOUR);
   ctx.agent.completeFinished();
   await ctx.agent.processNft();
   const t = ctx.nft.tokens.get(String(tokenIdFor(booking.id)));
-  assert.match(leer(t.uri).attributes.find((a) => a.trait_type === 'Estado').value, /Jugada/);
+  assert.match(leer(t.uri).attributes.find((a) => a.trait_type === 'Status').value, /Played/);
   assert.equal(ctx.store.getBooking(booking.id).nft_state, 'used');
   assert.equal(ctx.agent.nftInfo(ctx.store.getBooking(booking.id)).estado, 'jugado');
   assert.ok(ctx.store.decisions({ bookingId: booking.id }).some((d) => d.rule === 'NFT_USADO'));
@@ -136,7 +136,7 @@ test('cuando se juega el turno, el ticket pasa a "jugada" y queda de recuerdo', 
 
 test('si la cadena falla, la reserva queda confirmada y el ticket se reintenta solo', async () => {
   const ctx = conNft({ mint: 2 });
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: WED_20, customer: alice });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice });
   const r = await pagar(ctx, booking);
   assert.equal(r.kind, 'confirmado');
   assert.equal(ctx.store.getBooking(booking.id).status, 'confirmed'); // la reserva no depende del NFT
@@ -156,15 +156,15 @@ test('si la cadena falla, la reserva queda confirmada y el ticket se reintenta s
 
 test('si falla 5 veces se avisa al dueño y se puede reintentar desde el panel', async () => {
   const ctx = conNft({ mint: 99 });
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: WED_20, customer: alice });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice });
   await pagar(ctx, booking);
   for (let i = 0; i < 6; i++) await ctx.agent.processNft();
   const row = ctx.store.getBooking(booking.id);
   assert.equal(row.nft_attempts, 5); // dejó de reintentar solo
   assert.equal(ctx.agent.nftInfo(row).estado, 'error');
-  assert.match(ctx.agent.nftInfo(row).error, /Falla simulada/);
+  assert.match(ctx.agent.nftInfo(row).error, /Simulated failure/);
   assert.ok(ctx.store.decisions({ bookingId: booking.id }).some((d) => d.rule === 'NFT_FALLO'));
-  assert.ok(ctx.notifier.forOwner().some((m) => /ticket NFT/.test(m.text)));
+  assert.ok(ctx.notifier.forOwner().some((m) => /NFT ticket/.test(m.text)));
   assert.equal(ctx.store.getBooking(booking.id).status, 'confirmed');
   ctx.nft.fallas.mint = 0; // la cadena vuelve
   const re = await ctx.agent.retryNft(booking.id);
@@ -175,7 +175,7 @@ test('si falla 5 veces se avisa al dueño y se puede reintentar desde el panel',
 
 test('si se cancela antes de que salga el ticket, nunca se emite', async () => {
   const ctx = conNft({ mint: 99 });
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: WED_20, customer: alice });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice });
   await pagar(ctx, booking);
   await ctx.agent.cancel({ bookingId: booking.id, customerId: alice.id });
   ctx.nft.fallas.mint = 0;
@@ -186,7 +186,7 @@ test('si se cancela antes de que salga el ticket, nunca se emite', async () => {
 
 test('si el ticket ya existía en la cadena (un reintento después de un corte), no se emite de nuevo', async () => {
   const ctx = conNft();
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: WED_20, customer: alice });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice });
   ctx.nft.tokens.set(String(tokenIdFor(booking.id)), { to: PAYER_A, uri: 'data:,previo' }); // salió pero no se llegó a anotar
   await pagar(ctx, booking);
   assert.equal(ctx.nft.llamadas.filter(([a]) => a === 'mint').length, 0);
@@ -195,7 +195,7 @@ test('si el ticket ya existía en la cadena (un reintento después de un corte),
 
 test('sin cliente de NFT todo sigue igual y no hay ticket', async () => {
   const ctx = makeAgent();
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: WED_20, customer: alice });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: alice });
   await pagar(ctx, booking);
   assert.equal(ctx.agent.nftInfo(ctx.store.getBooking(booking.id)), null);
   assert.equal(ctx.store.getBooking(booking.id).nft_action, null);
@@ -219,7 +219,7 @@ after(() => new Promise((resolve) => server.close(resolve)));
 const post = async (path, body) => { const r = await fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) }); return { status: r.status, body: await r.json() }; };
 
 test('pago de prueba con billetera conectada: el ticket NFT va a esa billetera y se ve en la API', async () => {
-  const r = await post('/api/reservas', { recurso: 'Cancha 1', fecha: '2026-10-22', hora: '17:00', cliente: { nombre: 'Marta', canal: 'web' } });
+  const r = await post('/api/reservas', { recurso: 'Court 1', fecha: '2026-10-22', hora: '17:00', cliente: { nombre: 'Marta', canal: 'web' } });
   const id = r.body.reserva.id;
   assert.equal(r.body.reserva.nft, null); // todavía no pagó
   const meta0 = await fetch(`${base}/api/reservas/${id}/nft`);
@@ -233,11 +233,11 @@ test('pago de prueba con billetera conectada: el ticket NFT va a esa billetera y
   assert.equal(reserva.nft.simulado, true);
   assert.equal(ctxHttp.nft.tokens.get(String(tokenIdFor(id))).to.toLowerCase(), destino);
   const meta = await (await fetch(`${base}/api/reservas/${id}/nft`)).json();
-  assert.equal(meta.metadata.name, `Reserva ${id} · Cancha 1`);
+  assert.equal(meta.metadata.name, `Booking ${id} · Court 1`);
   assert.match(meta.metadata.image, /^data:image\/svg\+xml;base64,/);
   assert.ok(!JSON.stringify(meta).includes('Marta')); // el ticket no lleva nombres
   // Una dirección inválida se ignora: el ticket va a quien pagó.
-  const r2 = await post('/api/reservas', { recurso: 'Cancha 2', fecha: '2026-10-22', hora: '17:00', cliente: { nombre: 'Beto', canal: 'web' } });
+  const r2 = await post('/api/reservas', { recurso: 'Court 2', fecha: '2026-10-22', hora: '17:00', cliente: { nombre: 'Beto', canal: 'web' } });
   await post(`/api/modo-prueba/pagar/${r2.body.reserva.id}`, { billetera: '0xnoesunadireccion' });
   assert.match(ctxHttp.nft.tokens.get(String(tokenIdFor(r2.body.reserva.id))).to, /^0x[0-9a-fA-F]{40}$/);
 });

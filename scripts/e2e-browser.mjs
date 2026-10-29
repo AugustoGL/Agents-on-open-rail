@@ -97,8 +97,8 @@ try {
   await waitFor('document.querySelectorAll(".turno").length > 0', 'turnos en la página');
   const home = await text();
   assert.match(home, /Pádel Demo/);
-  assert.match(home, /Comercio de demostración/);
-  assert.match(home, /MODO PRUEBA/);
+  assert.match(home, /Demo venue/);
+  assert.match(home, /TEST MODE/);
   await shot('web-inicio');
 
   step('Reservar: elegir turno, completar el nombre y pasar a la página de pago');
@@ -108,36 +108,36 @@ try {
   await waitFor(`document.querySelector("#turnos").dataset.day === ${JSON.stringify(farDay)} && document.querySelectorAll(".turno:not(.turno--ocupado):not(.turno--bloqueado)").length > 0`, 'turnos de ese día');
   await evaluate('document.querySelector(".turno:not(.turno--ocupado):not(.turno--bloqueado)").click()');
   await waitFor('!document.querySelector("#formulario").hidden', 'el formulario');
-  assert.match(await text(), /Seña\s*\$\s*6\.000/);
-  await clickButton('Reservar y pagar la seña');
-  assert.match(await text(), /Escribí tu nombre/);
+  assert.match(await text(), /Deposit\s*\$\s*6,000/);
+  await clickButton('Book and pay the deposit');
+  assert.match(await text(), /Enter your name/);
   await setValue('#f-nombre', 'Marta <b>Prueba</b>');
   await setValue('#f-contacto', '351 555-0000');
   await click('#f-ok');
   await waitFor('/^\\/pagar\\/S-[A-Z0-9]{6}$/.test(location.pathname)', 'ir a /pagar/:id');
   const bookingId = (await evaluate('location.pathname')).split('/').pop();
-  await waitFor(pageHasText('Tenés'), 'la página de pago cargada');
-  assert.match(await text(), /MODO PRUEBA/);
+  await waitFor(pageHasText('You have'), 'la página de pago cargada');
+  assert.match(await text(), /TEST MODE/);
   await shot('web-pago');
 
   step('Pagar de prueba desde la página de pago (mismo camino x402) y ver la confirmación');
-  await waitFor(pageHasText('Pagar de prueba'), 'el botón de pago de prueba');
+  await waitFor(pageHasText('Pay as a test'), 'el botón de pago de prueba');
   await click('#pago-prueba');
-  await waitFor(pageHasText('Tu turno quedó confirmado'), 'la confirmación del pago');
-  assert.match(await text(), /simulado/);
+  await waitFor(pageHasText('Your slot is confirmed'), 'la confirmación del pago');
+  assert.match(await text(), /simulated/);
   assert.equal(store.getBooking(bookingId).status, 'confirmed');
   await shot('web-confirmacion');
   await goto('/');
-  await waitFor(pageHasText('Confirmada'), 'la reserva confirmada en Mis reservas');
+  await waitFor(pageHasText('Confirmed'), 'la reserva confirmada en Mis reservas');
   assert.ok(!(await evaluate('document.querySelector("#mis").innerHTML.includes("<b>")')), 'el nombre se muestra como texto');
   await shot('web-mis-reservas');
 
   step('Cancelar mostrando antes cuánto devuelve y por qué');
-  await clickButton('Cancelar');
-  await waitFor(pageHasText('te devolvemos $ 6.000'), 'la vista previa de la devolución');
-  assert.match(await text(), /toda la seña/);
-  await clickButton('Sí, cancelar mi reserva');
-  await waitFor(pageHasText('Reserva cancelada'), 'la reserva cancelada');
+  await clickButton('Cancel');
+  await waitFor(pageHasText('we refund $ 6,000'), 'la vista previa de la devolución');
+  assert.match(await text(), /whole deposit/);
+  await clickButton('Yes, cancel my booking');
+  await waitFor(pageHasText('Booking cancelled'), 'la reserva cancelada');
   assert.equal(store.getBooking(bookingId).status, 'cancelled');
   assert.equal(store.getCustomer(store.getBooking(bookingId).customer_id).contact, '351 555-0000');
 
@@ -152,14 +152,14 @@ try {
   await waitFor('!document.querySelector("#formulario").hidden', 'el formulario de lista de espera');
   await setValue('#f-nombre', 'Marta');
   await click('#f-ok');
-  await waitFor(pageHasText('Listo, quedaste primero en la lista de espera'), 'la confirmación de lista de espera');
-  await waitFor(pageHasText('Puesto 1'), 'la lista de espera en Mis reservas');
+  await waitFor(pageHasText('Done, you are first on the waitlist'), 'la confirmación de lista de espera');
+  await waitFor(pageHasText('Position 1'), 'la lista de espera en Mis reservas');
 
   step('El registro público de decisiones se ve sin datos personales');
   await goto('/decisiones');
   await waitFor('document.querySelectorAll(".decision").length > 0', 'decisiones del agente');
-  assert.match(await text(), /Qué decide el agente por su cuenta/);
-  assert.match(await text(), /Cobró una seña/);
+  assert.match(await text(), /What the agent decides on its own/);
+  assert.match(await text(), /Collected a deposit/);
   const decisions = await text();
   assert.doesNotMatch(decisions, /Marta|Prueba|0x[a-fA-F0-9]{40}/);
   await shot('web-decisiones');
@@ -169,13 +169,13 @@ try {
 
   step('El panel pide clave y no deja entrar con una mala');
   await goto('/panel');
-  await waitFor(pageHasText('Clave del panel'), 'el ingreso');
+  await waitFor(pageHasText('Dashboard password'), 'el ingreso');
   await setValue('#clave', 'mala');
   await evaluate('document.querySelector("form").requestSubmit()');
-  await waitFor(pageHasText('La clave no es correcta'), 'el error de clave');
+  await waitFor(pageHasText('The password is not correct'), 'el error de clave');
   await setValue('#clave', CLAVE);
   await evaluate('document.querySelector("form").requestSubmit()');
-  await waitFor(pageHasText('Señas cobradas hoy'), 'la pantalla Hoy');
+  await waitFor(pageHasText('Deposits collected today'), 'la pantalla Hoy');
   await shot('panel-hoy');
 
   step('Calendario: se ve cada turno con su estado y el detalle al tocar');
@@ -183,71 +183,71 @@ try {
   const b2 = agent.reserve({ resource: mine.resource, startAt: mine.startAt, customer: { id: `api:${'a'.repeat(32)}`, name: 'Beto <i>Pago</i>', channel: 'web', contact: '123' } }).booking;
   chain.credit(b2.deposit_wei);
   await agent.onPaymentSettled({ bookingId: b2.id, payer: '0x2222222222222222222222222222222222222222', tx: `0x${'ef'.repeat(32)}`, amountWei: b2.deposit_wei });
-  await clickButton('Calendario');
+  await clickButton('Calendar');
   await waitFor('document.querySelectorAll(".cal-celda").length > 0', 'el calendario');
   await setValue('input[type="date"]', day);
   await waitFor('document.querySelector(".cal-celda.es-confirmada")', 'un turno confirmado');
   await shot('panel-calendario-dia');
   await click('.cal-celda.es-confirmada');
-  await waitFor(pageHasText(`Reserva ${b2.id}`), 'el detalle de la reserva');
+  await waitFor(pageHasText(`Booking ${b2.id}`), 'el detalle de la reserva');
   assert.match(await text(), /Beto <i>Pago<\/i>/); // se muestra como texto, no como HTML
-  assert.match(await text(), /Cancela el comercio: devuelve todo/);
+  assert.match(await text(), /The venue cancels: full refund/);
   await shot('panel-reserva');
   await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))');
   await waitFor('!document.querySelector(".modal")', 'cerrar el detalle con Escape');
-  await clickButton('Semana');
+  await clickButton('Week');
   await waitFor('document.querySelector("table.cal-semana")', 'la vista de semana');
   await shot('panel-calendario-semana');
 
   step('Configuración: un valor malo marca el campo; uno bueno se guarda y queda en el historial');
-  await clickButton('Configuración');
+  await clickButton('Settings');
   await waitFor('document.querySelector("#c-precioTurnoArs")', 'el formulario de configuración');
   await setValue('#c-precioTurnoArs', '5');
-  await waitFor(pageHasText('Tenés cambios sin guardar'), 'la barra para guardar');
-  await clickButton('Guardar cambios');
-  await waitFor(pageHasText('tiene que estar entre'), 'el error de rango');
+  await waitFor(pageHasText('You have unsaved changes'), 'la barra para guardar');
+  await clickButton('Save changes');
+  await waitFor(pageHasText('must be between'), 'el error de rango');
   assert.equal(await evaluate('document.querySelector("#c-precioTurnoArs").getAttribute("aria-invalid")'), 'true');
   assert.equal(agent.business.precioTurnoArs, 24000);
   await setValue('#c-precioTurnoArs', '26000');
   await setValue('#c-nombre', 'Club Córdoba');
-  await clickButton('Guardar cambios');
-  await waitFor(pageHasText('Guardado.'), 'el aviso de guardado');
+  await clickButton('Save changes');
+  await waitFor(pageHasText('Saved.'), 'el aviso de guardado');
   assert.equal(agent.business.precioTurnoArs, 26000);
   assert.equal(agent.business.nombre, 'Club Córdoba');
-  assert.match(await text(), /Seña de cada turno nuevo: \$ 6\.500/);
+  assert.match(await text(), /Deposit for each new slot: \$ 6,500/);
   assert.match(await text(), /panel \(/);
   assert.equal(BigInt(store.getBooking(b2.id).deposit_wei), arsToWei(6000)); // la reserva pagada no cambió
   await shot('panel-config');
 
   step('Bloqueos: bloquear un día con una reserva pagada avisa y permite devolver todo');
-  await clickButton('Bloqueos');
+  await clickButton('Blocks');
   await waitFor('document.querySelector("#b-motivo")', 'el formulario de bloqueos');
   await setValue('#b-desde', day);
-  await setValue('#b-motivo', 'Feriado');
-  await clickButton('Bloquear');
-  await waitFor(pageHasText('dentro de este bloqueo'), 'el aviso de reservas dentro del bloqueo');
+  await setValue('#b-motivo', 'Public holiday');
+  await clickButton('Block');
+  await waitFor(pageHasText('inside this block'), 'el aviso de reservas dentro del bloqueo');
   await shot('panel-bloqueos');
-  await clickButton('Cancelar esas reservas y devolver todo');
+  await clickButton('Cancel those bookings and refund everything');
   await confirmarVentana();
-  await waitFor(pageHasText('devolución $ 6.000'), 'la cancelación con devolución');
+  await waitFor(pageHasText('refund $ 6,000'), 'la cancelación con devolución');
   assert.equal(store.getBooking(b2.id).status, 'cancelled');
   assert.ok(store.decisions({ bookingId: b2.id }).some((d) => d.rule === 'CANCELADO_POR_COMERCIO'));
 
   step('Decisiones, pendientes y cierre del día');
-  await clickButton('Decisiones del agente');
+  await clickButton('Agent decisions');
   await waitFor(pageHasText('CANCELADO_POR_COMERCIO'), 'la decisión en el registro del panel');
-  await clickButton('Pendientes');
-  await waitFor(pageHasText('Todo al día'), 'pendientes vacíos');
-  await clickButton('Cierre del día');
-  await waitFor(pageHasText('Pedir un cierre ahora'), 'la pantalla de cierre');
-  await clickButton('Pedir un cierre ahora');
+  await clickButton('Pending');
+  await waitFor(pageHasText('All caught up'), 'pendientes vacíos');
+  await clickButton('Daily close');
+  await waitFor(pageHasText('Request a close now'), 'la pantalla de cierre');
+  await clickButton('Request a close now');
   await confirmarVentana();
-  await waitFor(pageHasText('Último cierre'), 'el reporte del cierre');
+  await waitFor(pageHasText('Last close'), 'el reporte del cierre');
   await shot('panel-cierre');
 
   step('Salir cierra la sesión');
-  await clickButton('Salir');
-  await waitFor(pageHasText('Clave del panel'), 'volver al ingreso');
+  await clickButton('Sign out');
+  await waitFor(pageHasText('Dashboard password'), 'volver al ingreso');
 
   assert.deepEqual(problems, [], `Errores en la consola del navegador:\n${problems.join('\n')}`);
   console.log('\n✅ Todo bien: la web y el panel funcionan en un navegador real.');

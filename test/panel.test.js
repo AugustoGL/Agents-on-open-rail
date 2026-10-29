@@ -66,7 +66,7 @@ test('la página del panel se sirve con política de seguridad estricta', async 
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-security-policy'), /script-src 'self'/);
   assert.match(res.headers.get('content-security-policy'), /frame-ancestors 'none'/);
-  assert.match(await res.text(), /Panel del comercio/);
+  assert.match(await res.text(), /Venue dashboard/);
 });
 
 test('con una clave mala no entra, y con la buena sí (cookie httpOnly + SameSite=Strict)', async () => {
@@ -165,13 +165,13 @@ test('las respuestas del panel no se guardan en caché', async () => {
 
 test('hoy, calendario y reservas muestran lo que hay', async () => {
   const s = await login();
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: WED_20, customer: { ...alice, contact: '351-555' } });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: WED_20, customer: { ...alice, contact: '351-555' } });
   await payBooking(booking);
   const cal = await (await call('/panel/api/calendario?fecha=2026-10-21&vista=dia', { cookie: s.cookie })).json();
-  const cell = cal.dias[0].recursos.find((r) => r.nombre === 'Cancha 1').turnos.find((t) => t.hora === '20:00');
+  const cell = cal.dias[0].recursos.find((r) => r.nombre === 'Court 1').turnos.find((t) => t.hora === '20:00');
   assert.equal(cell.estado, 'confirmado');
   assert.equal(cell.reserva.cliente, 'Alicia');
-  assert.equal(cal.dias[0].recursos.find((r) => r.nombre === 'Cancha 2').turnos.find((t) => t.hora === '20:00').estado, 'libre');
+  assert.equal(cal.dias[0].recursos.find((r) => r.nombre === 'Court 2').turnos.find((t) => t.hora === '20:00').estado, 'libre');
   const week = await (await call('/panel/api/calendario?fecha=2026-10-21&vista=semana', { cookie: s.cookie })).json();
   assert.equal(week.dias.length, 7);
   assert.equal(week.desde, '2026-10-19'); // lunes
@@ -179,17 +179,17 @@ test('hoy, calendario y reservas muestran lo que hay', async () => {
   assert.equal(list.reservas.length, 1);
   assert.equal(list.reservas[0].contacto, '351-555');
   const detail = await (await call(`/panel/api/reservas/${booking.id}`, { cookie: s.cookie })).json();
-  assert.equal(detail.cancelarSegunPolitica.devolucion, '$ 6.000');
+  assert.equal(detail.cancelarSegunPolitica.devolucion, '$ 6,000');
   assert.equal(detail.cancelarDevolviendoTodo.regla, 'CANCELADO_POR_COMERCIO');
   const hoy = await (await call('/panel/api/hoy', { cookie: s.cookie })).json();
   assert.equal(hoy.fecha, '2026-10-19');
-  assert.equal(hoy.comprometido.senasFuturas.texto, '$ 6.000');
+  assert.equal(hoy.comprometido.senasFuturas.texto, '$ 6,000');
   const decisiones = await (await call('/panel/api/decisiones', { cookie: s.cookie })).json();
   assert.ok(decisiones.decisiones.some((d) => d.regla === 'SENA_COBRADA' && d.tx));
   // cancelar desde el panel pasa por el agente: devuelve y queda registrado
   const cancel = await call(`/panel/api/reservas/${booking.id}/cancelar`, { method: 'POST', body: { devolucion: 'politica' }, cookie: s.cookie, csrf: s.csrf });
   assert.equal(cancel.status, 200);
-  assert.equal((await cancel.json()).devolucion, '$ 6.000');
+  assert.equal((await cancel.json()).devolucion, '$ 6,000');
   assert.equal(ctx.store.getBooking(booking.id).status, 'cancelled');
   assert.ok(ctx.store.decisions({ bookingId: booking.id }).some((d) => d.rule === 'A_TIEMPO'));
   assert.equal((await call(`/panel/api/reservas/${booking.id}/cancelar`, { method: 'POST', body: {}, cookie: s.cookie, csrf: s.csrf })).status, 409);
@@ -198,8 +198,8 @@ test('hoy, calendario y reservas muestran lo que hay', async () => {
 test('pendientes: aprobar y rechazar usan los métodos del agente', async () => {
   const s = await login();
   ctx.agent.updateSettings({ limites: { devolucionMaxAutomaticaArs: 1000, devolucionesMaxDiariasArs: 5000 } });
-  const a = ctx.agent.reserve({ resource: 'Cancha 1', startAt: slot('2026-10-22', '17:00'), customer: alice }).booking;
-  const b = ctx.agent.reserve({ resource: 'Cancha 2', startAt: slot('2026-10-22', '17:00'), customer: alice }).booking;
+  const a = ctx.agent.reserve({ resource: 'Court 1', startAt: slot('2026-10-22', '17:00'), customer: alice }).booking;
+  const b = ctx.agent.reserve({ resource: 'Court 2', startAt: slot('2026-10-22', '17:00'), customer: alice }).booking;
   await payBooking(a);
   await payBooking(b);
   await call(`/panel/api/reservas/${a.id}/cancelar`, { method: 'POST', body: { devolucion: 'total' }, cookie: s.cookie, csrf: s.csrf });
@@ -207,7 +207,7 @@ test('pendientes: aprobar y rechazar usan los métodos del agente', async () => 
   const { transferencias } = await (await call('/panel/api/pendientes', { cookie: s.cookie })).json();
   const mine = transferencias.filter((t) => t.estado === 'needs_owner');
   assert.equal(mine.length, 2);
-  assert.equal(mine[0].monto.texto, '$ 6.000');
+  assert.equal(mine[0].monto.texto, '$ 6,000');
   const ok = await call(`/panel/api/transferencias/${mine[0].id}/aprobar`, { method: 'POST', body: {}, cookie: s.cookie, csrf: s.csrf });
   assert.equal((await ok.json()).estado, 'sent');
   const no = await call(`/panel/api/transferencias/${mine[1].id}/rechazar`, { method: 'POST', body: {}, cookie: s.cookie, csrf: s.csrf });
@@ -242,7 +242,7 @@ test('configuración: valida, guarda, registra y no deja tocar lo que es solo de
 
 test('bloqueos por el panel: avisa de las reservas adentro y las cancela con devolución total', async () => {
   const s = await login();
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: slot('2026-10-23', '20:00'), customer: alice });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: slot('2026-10-23', '20:00'), customer: alice });
   await payBooking(booking);
   const create = await call('/panel/api/bloqueos', { method: 'POST', body: { tipo: 'dia', fecha: '2026-10-23', motivo: 'Mantenimiento' }, cookie: s.cookie, csrf: s.csrf });
   assert.equal(create.status, 201);
@@ -251,7 +251,7 @@ test('bloqueos por el panel: avisa de las reservas adentro y las cancela con dev
   assert.equal(bloqueo.afectadas[0].id, booking.id);
   assert.equal((await call('/panel/api/bloqueos', { method: 'POST', body: { tipo: 'dia', fecha: 'mañana', motivo: '' }, cookie: s.cookie, csrf: s.csrf })).status, 400);
   const done = await (await call(`/panel/api/bloqueos/${bloqueo.id}/cancelar-reservas`, { method: 'POST', body: {}, cookie: s.cookie, csrf: s.csrf })).json();
-  assert.equal(done.resultados[0].devolucion, '$ 6.000');
+  assert.equal(done.resultados[0].devolucion, '$ 6,000');
   assert.equal(ctx.store.getBooking(booking.id).status, 'cancelled');
   const { bloqueos } = await (await call('/panel/api/bloqueos', { cookie: s.cookie })).json();
   assert.equal(bloqueos.find((k) => k.id === bloqueo.id).afectadas.length, 0);
@@ -263,14 +263,14 @@ test('cierre del día: se puede pedir y queda el último reporte', async () => {
   assert.equal((await (await call('/panel/api/cierre', { cookie: s.cookie })).json()).ultimo, null);
   const r = await call('/panel/api/cierre', { method: 'POST', body: {}, cookie: s.cookie, csrf: s.csrf });
   assert.equal(r.status, 200);
-  assert.match((await r.json()).reporte, /Cierre del 2026-10-19/);
+  assert.match((await r.json()).reporte, /Close of 2026-10-19/);
   const { ultimo } = await (await call('/panel/api/cierre', { cookie: s.cookie })).json();
   assert.match(ultimo.reporte, /Pádel Demo/);
 });
 
 test('el dinero de cancelar por el panel sale del agente, con tag y registro (no de la ruta)', async () => {
   const s = await login();
-  const { booking } = ctx.agent.reserve({ resource: 'Cancha 1', startAt: slot('2026-10-24', '20:00'), customer: alice });
+  const { booking } = ctx.agent.reserve({ resource: 'Court 1', startAt: slot('2026-10-24', '20:00'), customer: alice });
   await payBooking(booking);
   const before = ctx.chain.sent?.length ?? 0;
   await call(`/panel/api/reservas/${booking.id}/cancelar`, { method: 'POST', body: { devolucion: 'total' }, cookie: s.cookie, csrf: s.csrf });

@@ -15,7 +15,7 @@ const nft = createNftClient({ contract: contrato, privateKey: normalizePrivateKe
 const para = arg('to') ? (isAddress(arg('to')) ? getAddress(arg('to')) : (console.error('--to no es una dirección válida.'), process.exit(1))) : nft.agentAddress;
 const codigo = `S-TEST${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 const tokenId = tokenIdFor(codigo);
-const datos = { negocio: 'Pádel Demo', recurso: 'Cancha 1', cuando: 'jue 29/10 20:00', inicioMs: Date.now() + 86_400_000, sena: '$ 6.000', codigo };
+const datos = { negocio: 'Pádel Demo', recurso: 'Court 1', cuando: 'jue 29/10 20:00', inicioMs: Date.now() + 86_400_000, sena: '$ 6,000', codigo };
 
 console.log(`Red: ${nft.redNombre} · contrato ${nft.contract}\nPara: ${para}\nTicket: ${codigo} (id ${tokenId})`);
 const { hash } = await nft.mint({ to: para, tokenId, uri: tokenUri(ticketMetadata({ ...datos, estado: 'confirmada' })) });

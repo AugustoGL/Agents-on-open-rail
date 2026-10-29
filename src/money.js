@@ -16,12 +16,12 @@ export function weiToArsString(wei) {
   return formatUnits(BigInt(wei), WARS.decimals);
 }
 
-/** Formato para mostrar: "$ 5.000" o "$ 5.000,50". */
+/** Display format: "$ 5,000" or "$ 5,000.50". */
 export function formatArs(wei) {
   const [ent, dec = ''] = weiToArsString(wei).split('.');
-  const entFmt = ent.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const entFmt = ent.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const cents = dec.padEnd(2, '0').slice(0, 2);
-  return cents === '00' ? `$ ${entFmt}` : `$ ${entFmt},${cents}`;
+  return cents === '00' ? `$ ${entFmt}` : `$ ${entFmt}.${cents}`;
 }
 
 /** Porcentaje entero de un monto en wei, redondeado hacia abajo (nunca se devuelve de más). */

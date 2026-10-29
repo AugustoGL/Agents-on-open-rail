@@ -1,4 +1,4 @@
-// Página de pago para personas: conecta la billetera del navegador (MetaMask, MiniPay, etc.) y paga la seña con x402.
+// Payment page for people: conecta la billetera del navegador (MetaMask, MiniPay, etc.) y paga la seña con x402.
 // Se compila con `npm run build:web` a public/pay.bundle.js.
 // Las pantallas se arman con el DOM (nunca con HTML armado a mano): lo que viene del servidor entra como texto.
 import { createPublicClient, createWalletClient, custom, http, erc20Abi } from 'viem';
@@ -25,9 +25,9 @@ let reloj = null;
 let relojNft = null;
 let cuentaEl = null;
 
-const pesos = (wei) => `$ ${(Number(BigInt(wei) / 10n ** 16n) / 100).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+const pesos = (wei) => `$ ${(Number(BigInt(wei) / 10n ** 16n) / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 const nbsp = (s) => String(s).replace('$ ', '$ ');
-const errorDeRed = (err) => (err.status ? err.message : 'No pudimos conectarnos. Revisá tu conexión y probá de nuevo.');
+const errorDeRed = (err) => (err.status ? err.message : 'We could not connect. Check your connection and try again.');
 
 // --- Carga ----------------------------------------------------------------------------------------------------
 
@@ -68,13 +68,13 @@ function setPaso(listo) {
 
 function resumen(b, { pagada = false } = {}) {
   return h('dl', { class: 'resumen' },
-    h('div', {}, h('dt', {}, 'Turno'), h('dd', {}, `${b.recurso} · ${b.inicioLocal}`)),
-    pagada ? h('div', {}, h('dt', {}, 'Seña pagada'), h('dd', { class: 'num' }, nbsp(b.sena.texto), ' ', h('span', { class: 'monto-token' }, 'en wARS'))) : null,
-    h('div', {}, h('dt', {}, 'Reserva'), h('dd', { class: 'mono' }, b.id)));
+    h('div', {}, h('dt', {}, 'Slot'), h('dd', {}, `${b.recurso} · ${b.inicioLocal}`)),
+    pagada ? h('div', {}, h('dt', {}, 'Deposit paid'), h('dd', { class: 'num' }, nbsp(b.sena.texto), ' ', h('span', { class: 'monto-token' }, 'in wARS'))) : null,
+    h('div', {}, h('dt', {}, 'Booking'), h('dd', { class: 'mono' }, b.id)));
 }
 
 function politica() {
-  return h('details', {}, h('summary', {}, '¿Qué pasa si cancelo?'), h('ul', { class: 'pila--chica' }, (E.negocio?.politica ?? []).map((p) => h('li', {}, p))));
+  return h('details', {}, h('summary', {}, 'What happens if I cancel?'), h('ul', { class: 'pila--chica' }, (E.negocio?.politica ?? []).map((p) => h('li', {}, p))));
 }
 
 function vistaPagar() {
@@ -83,58 +83,58 @@ function vistaPagar() {
   const falta = !prueba && E.saldo !== null && E.saldo < BigInt(b.sena.wei);
   const nodes = [];
 
-  nodes.push(h('div', { class: 'tarjeta tarjeta--realzada pila' }, h('div', { class: 'dato' }, h('span', { class: 'dato-etiqueta' }, 'Pagás'), h('span', { class: 'dato-valor' }, nbsp(b.sena.texto)), h('span', { class: 'monto-token' }, 'en wARS, el peso argentino digital')), resumen(b)));
+  nodes.push(h('div', { class: 'tarjeta tarjeta--realzada pila' }, h('div', { class: 'dato' }, h('span', { class: 'dato-etiqueta' }, 'You pay'), h('span', { class: 'dato-valor' }, nbsp(b.sena.texto)), h('span', { class: 'monto-token' }, 'in wARS, the digital Argentine peso')), resumen(b)));
 
-  cuentaEl = h('div', { class: 'cuenta', role: 'timer', 'aria-label': 'Tiempo que queda para pagar' }, h('div', { class: 'cuenta-tiempo num' }, '--:--'), h('div', { class: 'cuenta-texto' }, `Tenés ${E.negocio.reservaSinPagarMinutos} minutos para pagar la seña`));
+  cuentaEl = h('div', { class: 'cuenta', role: 'timer', 'aria-label': 'Time left to pay' }, h('div', { class: 'cuenta-tiempo num' }, '--:--'), h('div', { class: 'cuenta-texto' }, `You have ${E.negocio.reservaSinPagarMinutos} minutes to pay the deposit`));
   nodes.push(cuentaEl);
   actualizarCuenta();
 
   // Billetera
-  const wallet = h('div', { class: 'tarjeta pila' }, h('h2', {}, 'Pagá con tu billetera'));
+  const wallet = h('div', { class: 'tarjeta pila' }, h('h2', {}, 'Pay with your wallet'));
   if (E.mensaje) wallet.append(E.mensaje);
   if (!window.ethereum) {
     wallet.append(
-      aviso('atencion', h('strong', {}, 'No encontramos una billetera en este navegador'),
-        'Para pagar necesitás una billetera como MetaMask o MiniPay. Abrí este mismo link desde el navegador de tu billetera.'),
-      h('button', { class: 'btn btn-secundario btn-bloque', type: 'button', onclick: copiarLink }, icono('external'), E.copiado ? '¡Link copiado!' : 'Copiar el link para abrirlo en mi billetera'));
+      aviso('atencion', h('strong', {}, 'We could not find a wallet in this browser'),
+        'To pay you need a wallet such as MetaMask or MiniPay. Open this same link from your wallet\'s browser.'),
+      h('button', { class: 'btn btn-secundario btn-bloque', type: 'button', onclick: copiarLink }, icono('external'), E.copiado ? 'Link copied!' : 'Copy the link to open it in my wallet'));
   } else if (!E.cuenta) {
     wallet.append(
-      h('p', { class: 'apagado' }, 'Conectá tu billetera para ver tu saldo y firmar el pago. No cuesta comisión de red.'),
-      h('button', { class: 'btn btn-primario btn-grande btn-bloque', type: 'button', onclick: conectar, ...(E.conectando ? { 'aria-busy': 'true' } : {}) }, icono('wallet'), E.conectando ? 'Conectando…' : 'Conectar mi billetera'));
+      h('p', { class: 'apagado' }, 'Connect your wallet to see your balance and sign the payment. There is no network fee.'),
+      h('button', { class: 'btn btn-primario btn-grande btn-bloque', type: 'button', onclick: conectar, ...(E.conectando ? { 'aria-busy': 'true' } : {}) }, icono('wallet'), E.conectando ? 'Connecting…' : 'Connect my wallet'));
   } else {
     wallet.append(h('dl', { class: 'resumen' },
-      h('div', {}, h('dt', {}, 'Billetera'), h('dd', { class: 'mono' }, abreviar(E.cuenta))),
-      h('div', {}, h('dt', {}, 'Tu saldo'), h('dd', { class: 'num' }, E.saldo === null ? '—' : `${nbsp(pesos(E.saldo))} en wARS`))));
+      h('div', {}, h('dt', {}, 'Wallet'), h('dd', { class: 'mono' }, abreviar(E.cuenta))),
+      h('div', {}, h('dt', {}, 'Your balance'), h('dd', { class: 'num' }, E.saldo === null ? '—' : `${nbsp(pesos(E.saldo))} in wARS`))));
     if (!E.redOk) {
-      wallet.append(aviso('atencion', h('strong', {}, 'Tu billetera está en otra red'), 'Para pagar tiene que estar en la red Celo.'),
-        h('button', { class: 'btn btn-primario btn-grande btn-bloque', type: 'button', onclick: cambiarRed }, 'Cambiar a la red Celo'));
+      wallet.append(aviso('atencion', h('strong', {}, 'Your wallet is on another network'), 'To pay it has to be on the Celo network.'),
+        h('button', { class: 'btn btn-primario btn-grande btn-bloque', type: 'button', onclick: cambiarRed }, 'Switch to the Celo network'));
     } else if (falta) {
-      wallet.append(aviso('atencion', h('strong', {}, 'No te alcanza el saldo'), `Te faltan ${nbsp(pesos(BigInt(b.sena.wei) - E.saldo))} en wARS para pagar la seña.`),
-        h('a', { class: 'btn btn-primario btn-grande btn-bloque', href: rampa(), target: '_blank', rel: 'noopener noreferrer' }, icono('external'), 'Cargar pesos con Ripio'),
-        h('button', { class: 'btn btn-secundario btn-bloque', type: 'button', onclick: async () => { await refrescarBilletera(); render(); } }, 'Ya cargué, revisar de nuevo'));
+      wallet.append(aviso('atencion', h('strong', {}, 'Your balance is not enough'), `You are short ${nbsp(pesos(BigInt(b.sena.wei) - E.saldo))} in wARS to pay the deposit.`),
+        h('a', { class: 'btn btn-primario btn-grande btn-bloque', href: rampa(), target: '_blank', rel: 'noopener noreferrer' }, icono('external'), 'Add pesos with Ripio'),
+        h('button', { class: 'btn btn-secundario btn-bloque', type: 'button', onclick: async () => { await refrescarBilletera(); render(); } }, 'I topped up, check again'));
     } else if (E.necesitaAprobar) {
-      wallet.append(aviso('info', h('strong', {}, 'Un paso más, una sola vez'), 'Hay que habilitar wARS para pagar sin comisión de red. Se hace una vez y cuesta unos centavos de CELO.'),
-        h('button', { class: 'btn btn-primario btn-grande btn-bloque', type: 'button', onclick: aprobar, ...(E.aprobando ? { 'aria-busy': 'true' } : {}) }, E.aprobando ? 'Habilitando…' : 'Habilitar wARS'));
+      wallet.append(aviso('info', h('strong', {}, 'One more step, just once'), 'wARS has to be enabled to pay without a network fee. It is done once and costs a few cents of CELO.'),
+        h('button', { class: 'btn btn-primario btn-grande btn-bloque', type: 'button', onclick: aprobar, ...(E.aprobando ? { 'aria-busy': 'true' } : {}) }, E.aprobando ? 'Enabling…' : 'Enable wARS'));
     } else {
       wallet.append(h('button', { class: 'btn btn-primario btn-grande btn-bloque', type: 'button', onclick: pagar, ...(E.pagando ? { 'aria-busy': 'true' } : {}) },
-        E.pagando ? 'Pagando…' : `Pagar ${nbsp(b.sena.texto)}`));
-      if (E.pagando) wallet.append(aviso('info', h('strong', {}, 'Estamos procesando tu pago'), 'Firmá en tu billetera y esperá unos segundos. No cierres esta página.'));
+        E.pagando ? 'Paying…' : `Pay ${nbsp(b.sena.texto)}`));
+      if (E.pagando) wallet.append(aviso('info', h('strong', {}, 'We are processing your payment'), 'Sign in your wallet and wait a few seconds. Do not close this page.'));
     }
   }
   nodes.push(wallet);
 
   if (prueba) {
-    nodes.push(h('div', { class: 'tarjeta pila' }, h('h2', {}, 'Probar sin billetera'),
-      aviso('info', h('strong', {}, 'MODO PRUEBA'), 'Podés recorrer todo el pago sin billetera ni plata: usamos una billetera de prueba y el mismo camino que un pago de verdad.',
-        E.negocio?.nft ? (E.cuenta ? ` El ticket NFT va a tu billetera (${abreviar(E.cuenta)}).` : ' Si conectás tu billetera arriba, el ticket NFT llega a ella.') : ''),
-      h('button', { class: 'btn btn-secundario btn-bloque', type: 'button', id: 'pago-prueba', onclick: pagoDePrueba, ...(E.pagando ? { 'aria-busy': 'true' } : {}) }, 'Pagar de prueba')));
+    nodes.push(h('div', { class: 'tarjeta pila' }, h('h2', {}, 'Try without a wallet'),
+      aviso('info', h('strong', {}, 'TEST MODE'), 'You can go through the whole payment with no wallet and no money: we use a test wallet and the same path as a real payment.',
+        E.negocio?.nft ? (E.cuenta ? ` The NFT ticket goes to your wallet (${abreviar(E.cuenta)}).` : ' If you connect your wallet above, the NFT ticket goes to it.') : ''),
+      h('button', { class: 'btn btn-secundario btn-bloque', type: 'button', id: 'pago-prueba', onclick: pagoDePrueba, ...(E.pagando ? { 'aria-busy': 'true' } : {}) }, 'Pay as a test')));
   }
 
-  nodes.push(h('details', {}, h('summary', {}, '¿No tenés wARS?'),
+  nodes.push(h('details', {}, h('summary', {}, 'Don\'t have wARS?'),
     h('div', { class: 'pila--chica' },
-      h('p', {}, 'wARS es el peso argentino digital: 1 wARS vale 1 peso. Podés cargarlo con pesos desde tu cuenta bancaria o Mercado Pago a través de Ripio.'),
-      h('a', { class: 'btn btn-secundario', href: rampa(), target: '_blank', rel: 'noopener noreferrer' }, icono('external'), 'Cargar pesos con Ripio'),
-      h('p', { class: 'apagado chica' }, 'Cuando termines, volvé a esta página: tu reserva te espera mientras corra el tiempo.'))));
+      h('p', {}, 'wARS is the digital Argentine peso: 1 wARS is worth 1 peso. You can load it with pesos from your bank account or Mercado Pago through Ripio.'),
+      h('a', { class: 'btn btn-secundario', href: rampa(), target: '_blank', rel: 'noopener noreferrer' }, icono('external'), 'Add pesos with Ripio'),
+      h('p', { class: 'apagado chica' }, 'When you are done, come back to this page: your booking waits for you while the time runs.'))));
   nodes.push(politica());
   return nodes;
 }
@@ -144,11 +144,11 @@ function vistaPagada() {
   const tx = E.pagoTx ?? b.pagoTx;
   const real = isTxHash(tx) && !E.negocio.modoPrueba;
   return [
-    h('div', { class: 'comprobante pila' }, h('h2', {}, '¡Tu turno quedó confirmado!'), resumen(b, { pagada: true }),
-      h('dl', { class: 'resumen' }, h('div', {}, h('dt', {}, 'Comprobante'), h('dd', {}, real ? h('a', { href: safeHref(`https://celoscan.io/tx/${tx}`), target: '_blank', rel: 'noopener noreferrer' }, abreviar(tx)) : (tx ? h('span', { class: 'mono' }, `${abreviar(tx)} (simulado)`) : '—'))))),
+    h('div', { class: 'comprobante pila' }, h('h2', {}, 'Your slot is confirmed!'), resumen(b, { pagada: true }),
+      h('dl', { class: 'resumen' }, h('div', {}, h('dt', {}, 'Receipt'), h('dd', {}, real ? h('a', { href: safeHref(`https://celoscan.io/tx/${tx}`), target: '_blank', rel: 'noopener noreferrer' }, abreviar(tx)) : (tx ? h('span', { class: 'mono' }, `${abreviar(tx)} (simulated)`) : '—'))))),
     ...tarjetaNft(),
-    aviso('info', h('strong', {}, 'Si necesitás cancelar'), 'Entrá a "Mis reservas": antes de confirmar te mostramos cuánto te devolvemos y por qué. Desde cualquier dispositivo la ves conectando la billetera con la que pagaste.'),
-    h('div', { class: 'acciones' }, h('a', { class: 'btn btn-primario', href: '/#mis-reservas' }, 'Ver mis reservas'), h('a', { class: 'btn btn-secundario', href: '/' }, 'Reservar otro turno')),
+    aviso('info', h('strong', {}, 'If you need to cancel'), 'Go to "My bookings": before you confirm we show how much we refund and why. From any device you can see it by connecting the wallet you paid with.'),
+    h('div', { class: 'acciones' }, h('a', { class: 'btn btn-primario', href: '/#mis-reservas' }, 'See my bookings'), h('a', { class: 'btn btn-secundario', href: '/' }, 'Book another slot')),
     politica(),
   ];
 }
@@ -158,21 +158,21 @@ function vistaPagada() {
 function tarjetaNft() {
   const n = E.booking?.nft;
   if (!n) return [];
-  const nodos = [h('h2', {}, 'Tu reserva, como NFT')];
-  if (E.nftMeta) nodos.push(h('img', { class: 'ticket-imagen', src: E.nftMeta.image, alt: `Ticket de la reserva ${E.booking.id}: ${E.booking.recurso}, ${E.booking.inicioLocal}`, width: '600', height: '340' }));
-  if (n.estado === 'enviando') nodos.push(aviso('info', h('strong', {}, 'Estamos mandando el ticket a tu billetera'), 'Tarda unos segundos. No hace falta que hagas nada: tu reserva ya está confirmada.'));
-  else if (n.estado === 'error') nodos.push(aviso('atencion', h('strong', {}, 'El ticket todavía no salió'), 'Tu reserva está confirmada igual. Seguimos intentando mandarlo a tu billetera.'));
-  else nodos.push(aviso('ok', h('strong', {}, n.estado === 'jugado' ? 'Ticket de un turno ya jugado' : 'Ya está en tu billetera'), `Es un ticket NFT intransferible, de la billetera ${abreviar(n.billetera)}.`));
+  const nodos = [h('h2', {}, 'Your booking, as an NFT')];
+  if (E.nftMeta) nodos.push(h('img', { class: 'ticket-imagen', src: E.nftMeta.image, alt: `Ticket for booking ${E.booking.id}: ${E.booking.recurso}, ${E.booking.inicioLocal}`, width: '600', height: '340' }));
+  if (n.estado === 'enviando') nodos.push(aviso('info', h('strong', {}, 'We are sending the ticket to your wallet'), 'It takes a few seconds. You do not need to do anything: your booking is already confirmed.'));
+  else if (n.estado === 'error') nodos.push(aviso('atencion', h('strong', {}, 'The ticket has not gone out yet'), 'Your booking is confirmed anyway. We keep trying to send it to your wallet.'));
+  else nodos.push(aviso('ok', h('strong', {}, n.estado === 'jugado' ? 'Ticket for a slot already played' : 'It is already in your wallet'), `It is a non-transferable NFT ticket, for wallet ${abreviar(n.billetera)}.`));
   nodos.push(h('dl', { class: 'resumen' },
-    h('div', {}, h('dt', {}, 'Billetera'), h('dd', { class: 'mono' }, abreviar(n.billetera))),
-    h('div', {}, h('dt', {}, 'Red'), h('dd', {}, n.red))));
-  if (n.simulado) nodos.push(aviso('info', h('strong', {}, 'Simulación'), 'En esta demo el ticket no está en ninguna cadena real: así se vería en tu billetera.'));
+    h('div', {}, h('dt', {}, 'Wallet'), h('dd', { class: 'mono' }, abreviar(n.billetera))),
+    h('div', {}, h('dt', {}, 'Network'), h('dd', {}, n.red))));
+  if (n.simulado) nodos.push(aviso('info', h('strong', {}, 'Simulation'), 'In this demo the ticket is not on any real chain: this is how it would look in your wallet.'));
   if (E.nftMensaje) nodos.push(E.nftMensaje);
   const listo = n.estado === 'enviado' || n.estado === 'jugado';
   if (!n.simulado && listo) {
     nodos.push(h('div', { class: 'acciones' },
-      h('a', { class: 'btn btn-secundario', href: safeHref(n.urlToken), target: '_blank', rel: 'noopener noreferrer' }, icono('external'), 'Ver en el explorador'),
-      window.ethereum ? h('button', { class: 'btn btn-primario', type: 'button', onclick: agregarNft }, icono('wallet'), 'Agregar a mi billetera') : null));
+      h('a', { class: 'btn btn-secundario', href: safeHref(n.urlToken), target: '_blank', rel: 'noopener noreferrer' }, icono('external'), 'View in the explorer'),
+      window.ethereum ? h('button', { class: 'btn btn-primario', type: 'button', onclick: agregarNft }, icono('wallet'), 'Add to my wallet') : null));
   }
   return [h('section', { class: 'tarjeta pila' }, nodos)];
 }
@@ -189,9 +189,9 @@ async function agregarNft() {
       await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId, chainName: n.red, nativeCurrency: n.moneda, rpcUrls: [n.rpcUrl], blockExplorerUrls: [n.explorador] }] });
     }
     const ok = await window.ethereum.request({ method: 'wallet_watchAsset', params: { type: 'ERC721', options: { address: n.contrato, tokenId: n.tokenId } } });
-    E.nftMensaje = ok ? aviso('ok', 'Listo: ya lo ves en tu billetera, en la sección de coleccionables.') : aviso('info', 'No se agregó. Podés verlo en el explorador o intentarlo de nuevo.');
+    E.nftMensaje = ok ? aviso('ok', 'Done: you can now see it in your wallet, in the collectibles section.') : aviso('info', 'It was not added. You can view it in the explorer or try again.');
   } catch (err) {
-    E.nftMensaje = mensajeDeBilletera(err, 'No pudimos agregarlo a tu billetera');
+    E.nftMensaje = mensajeDeBilletera(err, 'We could not add it to your wallet');
   }
   render();
 }
@@ -207,20 +207,20 @@ async function vigilarNft() {
   }, 3000);
 }
 
-const vistaVencida = () => [vacio({ icon: 'hourglass', titulo: 'Se venció el tiempo para pagar', texto: 'El turno se liberó para que lo pueda tomar otra persona. Si todavía lo querés, reservalo de nuevo.', accion: h('a', { class: 'btn btn-primario', href: '/' }, 'Reservar de nuevo') })];
-const vistaCancelada = () => [vacio({ icon: 'x', titulo: 'Esta reserva está cancelada', texto: 'No hace falta pagar nada. Podés elegir otro turno cuando quieras.', accion: h('a', { class: 'btn btn-primario', href: '/' }, 'Elegir otro turno') })];
-const vistaNoExiste = () => [vacio({ icon: 'search', titulo: 'No encontramos esa reserva', texto: 'Revisá que el link esté completo. Si reservaste desde este navegador, la ves en "Mis reservas".', accion: h('a', { class: 'btn btn-primario', href: '/#mis-reservas' }, 'Ir a mis reservas') })];
-const vistaRed = () => [aviso('error', h('strong', {}, 'No pudimos cargar tu reserva'), E.fallo, h('div', { class: 'acciones' }, h('button', { class: 'btn btn-secundario', type: 'button', onclick: () => { E.vista = 'cargando'; render(); cargar(); } }, 'Probar de nuevo')))];
+const vistaVencida = () => [vacio({ icon: 'hourglass', titulo: 'The time to pay has run out', texto: 'The slot was released so someone else can take it. If you still want it, book it again.', accion: h('a', { class: 'btn btn-primario', href: '/' }, 'Book again') })];
+const vistaCancelada = () => [vacio({ icon: 'x', titulo: 'This booking is cancelled', texto: 'There is nothing to pay. You can pick another slot whenever you like.', accion: h('a', { class: 'btn btn-primario', href: '/' }, 'Pick another slot') })];
+const vistaNoExiste = () => [vacio({ icon: 'search', titulo: 'We could not find that booking', texto: 'Check that the link is complete. If you booked from this browser, you can see it in "My bookings".', accion: h('a', { class: 'btn btn-primario', href: '/#mis-reservas' }, 'Go to my bookings') })];
+const vistaRed = () => [aviso('error', h('strong', {}, 'We could not load your booking'), E.fallo, h('div', { class: 'acciones' }, h('button', { class: 'btn btn-secundario', type: 'button', onclick: () => { E.vista = 'cargando'; render(); cargar(); } }, 'Try again')))];
 
 function render() {
   if (E.negocio) setChildren($('#carteles'), carteles(E.negocio));
   setChildren($('#barra'), barraCliente());
   const pagada = E.vista === 'pagada';
   setPaso(pagada);
-  $('#titulo').textContent = pagada ? '¡Listo, estás adentro!' : 'Pagá la seña';
-  $('#subtitulo').textContent = pagada ? 'Tu turno está confirmado.' : (E.vista === 'pagar' ? 'Es el último paso para confirmar tu turno.' : '');
-  document.title = `${pagada ? 'Turno confirmado' : 'Pagá la seña'} · Seña`;
-  const vistas = { pagar: vistaPagar, pagada: vistaPagada, vencida: vistaVencida, cancelada: vistaCancelada, noexiste: vistaNoExiste, red: vistaRed, cargando: () => [cargando('Cargando tu reserva…')] };
+  $('#titulo').textContent = pagada ? 'Done, you are in!' : 'Pay the deposit';
+  $('#subtitulo').textContent = pagada ? 'Your slot is confirmed.' : (E.vista === 'pagar' ? 'This is the last step to confirm your slot.' : '');
+  document.title = `${pagada ? 'Slot confirmed' : 'Pay the deposit'} · Seña`;
+  const vistas = { pagar: vistaPagar, pagada: vistaPagada, vencida: vistaVencida, cancelada: vistaCancelada, noexiste: vistaNoExiste, red: vistaRed, cargando: () => [cargando('Loading your booking…')] };
   clearInterval(reloj);
   cuentaEl = null;
   setChildren($('#vista'), vistas[E.vista]());
@@ -237,7 +237,7 @@ function actualizarCuenta() {
   tiempo.textContent = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
   const urgente = total <= 120;
   if (urgente) cuentaEl.setAttribute('data-urgente', ''); else cuentaEl.removeAttribute('data-urgente');
-  cuentaEl.lastChild.textContent = urgente ? 'Se está por vencer: pagá ahora o el turno se libera' : `Tenés ${Math.ceil(total / 60)} minutos para pagar la seña`;
+  cuentaEl.lastChild.textContent = urgente ? 'About to expire: pay now or the slot is released' : `You have ${Math.ceil(total / 60)} minutes to pay the deposit`;
 }
 
 // --- Billetera -------------------------------------------------------------------------------------------------
@@ -245,9 +245,9 @@ function actualizarCuenta() {
 const rampa = () => `https://ramp.ripio.com/?country=AR&chain=42220&token=WARS${E.cuenta ? `&address=${E.cuenta}` : ''}`;
 
 function mensajeDeBilletera(err, fallback) {
-  if (err?.code === 4001 || /user rejected|user denied|rejected the request/i.test(err?.message ?? '')) return aviso('info', h('strong', {}, 'No aceptaste en tu billetera'), 'No pasó nada ni se cobró nada. Podés intentar de nuevo cuando quieras.');
-  if (err?.code === -32002) return aviso('atencion', h('strong', {}, 'Tu billetera tiene un pedido abierto'), 'Abrila y respondé ese pedido primero.');
-  return aviso('error', h('strong', {}, fallback), err?.shortMessage ?? err?.message ?? 'Probá de nuevo.');
+  if (err?.code === 4001 || /user rejected|user denied|rejected the request/i.test(err?.message ?? '')) return aviso('info', h('strong', {}, 'You did not approve in your wallet'), 'Nothing happened and nothing was charged. You can try again whenever you like.');
+  if (err?.code === -32002) return aviso('atencion', h('strong', {}, 'Your wallet has an open request'), 'Open it and answer that request first.');
+  return aviso('error', h('strong', {}, fallback), err?.shortMessage ?? err?.message ?? 'Please try again.');
 }
 
 async function refrescarBilletera() {
@@ -268,7 +268,7 @@ async function conectar() {
     await refrescarBilletera();
   } catch (err) {
     E.cuenta = null;
-    E.mensaje = mensajeDeBilletera(err, 'No pudimos conectar tu billetera');
+    E.mensaje = mensajeDeBilletera(err, 'We could not connect your wallet');
   }
   E.conectando = false; render();
 }
@@ -284,13 +284,13 @@ async function cambiarRed() {
     }
     await refrescarBilletera();
   } catch (err) {
-    E.mensaje = mensajeDeBilletera(err, 'No pudimos cambiar de red');
+    E.mensaje = mensajeDeBilletera(err, 'We could not switch networks');
   }
   render();
 }
 
 async function copiarLink() {
-  try { await navigator.clipboard.writeText(location.href); E.copiado = true; } catch { window.prompt('Copiá este link:', location.href); }
+  try { await navigator.clipboard.writeText(location.href); E.copiado = true; } catch { window.prompt('Copy this link:', location.href); }
   render();
 }
 
@@ -301,9 +301,9 @@ async function aprobar() {
     const hash = await walletClient.sendTransaction({ account: E.cuenta, to: tx.to, data: tx.data });
     await publicClient.waitForTransactionReceipt({ hash });
     E.necesitaAprobar = false;
-    E.mensaje = aviso('ok', h('strong', {}, 'Listo, wARS habilitado'), 'Ahora tocá "Pagar".');
+    E.mensaje = aviso('ok', h('strong', {}, 'Done, wARS enabled'), 'Now tap "Pay".');
   } catch (err) {
-    E.mensaje = mensajeDeBilletera(err, 'No se pudo habilitar wARS');
+    E.mensaje = mensajeDeBilletera(err, 'Could not enable wARS');
   }
   E.aprobando = false; render();
 }
@@ -334,13 +334,13 @@ async function pagar() {
     const allowance = await readPermit2Allowance(publicClient, E.cuenta).catch(() => null);
     if (allowance !== null && allowance < BigInt(E.booking.sena.wei)) {
       E.necesitaAprobar = true;
-      E.mensaje = aviso('atencion', h('strong', {}, 'Falta un paso antes del primer pago'), 'Tocá "Habilitar wARS" y después volvé a tocar "Pagar".');
+      E.mensaje = aviso('atencion', h('strong', {}, 'One step is missing before the first payment'), 'Tap "Enable wARS" and then tap "Pay" again.');
     } else {
-      E.mensaje = aviso('error', h('strong', {}, 'No se pudo completar el pago'), `${body.error ?? body.errorReason ?? body.invalidReason ?? 'Probá de nuevo en un momento.'} No se cobró nada.`);
+      E.mensaje = aviso('error', h('strong', {}, 'The payment could not be completed'), `${body.error ?? body.errorReason ?? body.invalidReason ?? 'Please try again in a moment.'} Nothing was charged.`);
     }
   } catch (err) {
     E.pagando = false;
-    E.mensaje = mensajeDeBilletera(err, 'No se pudo completar el pago');
+    E.mensaje = mensajeDeBilletera(err, 'The payment could not be completed');
   }
   render();
 }
@@ -356,7 +356,7 @@ async function pagoDePrueba() {
     E.pagando = false;
     if (err.status === 410) E.vista = 'vencida';
     else if (err.status === 409) { await cargar(); return; }
-    else E.mensaje = aviso('error', h('strong', {}, 'No se pudo hacer el pago de prueba'), errorDeRed(err));
+    else E.mensaje = aviso('error', h('strong', {}, 'The test payment could not be made'), errorDeRed(err));
   }
   render();
 }

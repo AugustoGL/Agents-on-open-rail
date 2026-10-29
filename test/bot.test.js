@@ -38,20 +38,20 @@ function harness({ publicBaseUrl = 'https://sena.example' } = {}) {
 test('el flujo de reserva por botones termina con un link de pago', async () => {
   const h = harness();
   await h.send(10, '/start');
-  assert.match(h.messages(10)[0].payload.text, /seña de \$ 6\.000/);
+  assert.match(h.messages(10)[0].payload.text, /deposit of \$ 6,000/);
   await h.press(10, 'menu:reservar');
   const days = h.buttons(h.messages(10).at(-1));
   assert.ok(days.length >= 7);
   await h.press(10, 'd:2026-10-21');
   const slotsMsg = h.messages(10).at(-1);
-  const pick = h.buttons(slotsMsg).find((b) => b.text === '20:00 · Cancha 1');
+  const pick = h.buttons(slotsMsg).find((b) => b.text === '20:00 · Court 1');
   assert.ok(pick);
   await h.press(10, pick.callback_data);
   const done = h.messages(10).at(-1);
-  assert.match(done.payload.text, /Te guardé el turno/);
+  assert.match(done.payload.text, /I held the slot/);
   const payBtn = h.buttons(done).find((b) => b.url);
   assert.match(payBtn.url, /^https:\/\/sena\.example\/pagar\/S-/);
-  assert.equal(h.store.activeBookingForSlot('Cancha 1', slot('2026-10-21', '20:00')).customer_id, 'tg:10');
+  assert.equal(h.store.activeBookingForSlot('Court 1', slot('2026-10-21', '20:00')).customer_id, 'tg:10');
 });
 
 test('en local el link va como texto porque Telegram no acepta botones http', async () => {
@@ -68,16 +68,16 @@ test('un turno ocupado ofrece la lista de espera y avisa cuando se libera', asyn
   await h.press(10, `r:0:${start}`);
   await h.press(20, `r:0:${start}`);
   const busy = h.messages(20).at(-1);
-  assert.match(busy.payload.text, /ya está tomado/);
+  assert.match(busy.payload.text, /already taken/);
   await h.press(20, h.buttons(busy)[0].callback_data);
-  assert.match(h.messages(20).at(-1).payload.text, /primero/);
+  assert.match(h.messages(20).at(-1).payload.text, /first/);
 
   // El primero cancela antes de pagar: el turno pasa al de la lista y le llega el aviso con botón.
-  const id = h.store.activeBookingForSlot('Cancha 1', start).id;
+  const id = h.store.activeBookingForSlot('Court 1', start).id;
   await h.press(10, `c:${id}`);
-  assert.match(h.messages(10).at(-1).payload.text, /sin costo/);
+  assert.match(h.messages(10).at(-1).payload.text, /no cost/);
   await h.press(10, `cx:${id}`);
-  const offer = h.messages(20).find((m) => /Se liberó/.test(m.payload.text));
+  const offer = h.messages(20).find((m) => /is free/.test(m.payload.text));
   assert.ok(offer);
   assert.ok(h.buttons(offer).some((b) => b.url));
 });
@@ -87,19 +87,19 @@ test('el texto libre se entiende: "hay cancha mañana a las 20?"', async () => {
   await h.send(10, '¿hay cancha mañana a las 20?');
   const msg = h.messages(10).at(-1);
   const labels = h.buttons(msg).map((b) => b.text);
-  assert.deepEqual(labels, ['20:00 · Cancha 1', '20:00 · Cancha 2']);
+  assert.deepEqual(labels, ['20:00 · Court 1', '20:00 · Court 2']);
 });
 
 test('los comandos del dueño solo funcionan para el dueño', async () => {
   const h = harness();
   await h.send(10, '/hoy');
-  assert.match(h.messages(10).at(-1).payload.text, /solo para el dueño/);
+  assert.match(h.messages(10).at(-1).payload.text, /owner only/);
   await h.send(OWNER, '/hoy');
-  assert.match(h.messages(OWNER).at(-1).payload.text, /no hay turnos|Turnos de hoy/);
+  assert.match(h.messages(OWNER).at(-1).payload.text, /No slots|Today's slots/);
   await h.send(OWNER, '/saldo');
-  assert.match(h.messages(OWNER).at(-1).payload.text, /Saldo wARS/);
+  assert.match(h.messages(OWNER).at(-1).payload.text, /wARS balance/);
   await h.send(OWNER, '/pendientes');
-  assert.match(h.messages(OWNER).at(-1).payload.text, /No hay transferencias/);
+  assert.match(h.messages(OWNER).at(-1).payload.text, /no pending transfers/);
 });
 
 test('interpretación por reglas', () => {
@@ -115,16 +115,32 @@ test('interpretación por reglas', () => {
   assert.equal(parseIntentHeuristic('cuánto sale?', ctx).accion, 'politica');
   assert.equal(parseIntentHeuristic('hola!', ctx).accion, 'ayuda');
   assert.equal(parseIntentHeuristic('mañana 9 de la noche cancha 2', ctx).hora, '21:00');
-  assert.equal(parseIntentHeuristic('mañana 9 de la noche cancha 2', ctx).recurso, 'Cancha 2');
+  assert.equal(parseIntentHeuristic('mañana 9 de la noche cancha 2', ctx).recurso, 'Court 2');
   assert.equal(parseIntentHeuristic('el 25/10 a las 18:30', ctx).fecha, '2026-10-25');
   assert.equal(parseIntentHeuristic('qué onda el clima', ctx).accion, 'otro');
+  // Inglés
+  const en = (x) => parseIntentHeuristic(x, ctx);
+  assert.equal(en('tomorrow 9 pm court 2').hora, '21:00');
+  assert.equal(en('tomorrow 9 pm court 2').fecha, parseIntentHeuristic('mañana 9 de la noche cancha 2', ctx).fecha);
+  assert.equal(en('tomorrow 9 pm court 2').recurso, 'Court 2');
+  assert.equal(en('is there a court tomorrow at 9 pm?').accion, 'reservar');
+  assert.equal(en('is anything free on friday?').fecha, parseIntentHeuristic('viernes', ctx).fecha);
+  assert.equal(en('please cancel S-ABC234').accion, 'cancelar');
+  assert.equal(en('please cancel S-ABC234').reservaId, 'S-ABC234');
+  assert.equal(en('I can\'t make it').accion, 'mis_reservas');
+  assert.equal(en('show my bookings').accion, 'mis_reservas');
+  assert.equal(en('put me on the waitlist').accion, 'lista_espera');
+  assert.equal(en('how much is the deposit?').accion, 'politica');
+  assert.equal(en('what is the refund policy').accion, 'politica');
+  assert.equal(en('hello!').accion, 'ayuda');
+  assert.equal(en('what about the weather').accion, 'otro');
 });
 
 test('el intérprete con Claude arma bien el pedido y valida la respuesta', async () => {
   let sent;
   const fakeFetch = async (url, init) => {
     sent = { url, init, body: JSON.parse(init.body) };
-    return { ok: true, json: async () => ({ content: [{ type: 'tool_use', name: 'interpretar_pedido', input: { accion: 'reservar', fecha: '2026-10-22', hora: '21:30', recurso: 'Cancha 9', reservaId: 'robado' } }] }) };
+    return { ok: true, json: async () => ({ content: [{ type: 'tool_use', name: 'interpretar_pedido', input: { accion: 'reservar', fecha: '2026-10-22', hora: '21:30', recurso: 'Court 9', reservaId: 'robado' } }] }) };
   };
   const claude = createClaudeInterpreter({ apiKey: 'k', fetchImpl: fakeFetch });
   const interpret = createInterpreter({ claude });

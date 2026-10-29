@@ -1,9 +1,9 @@
 {
   "nombre": "Pádel Demo",
   "esDemostracion": true,
-  "descripcion": "Comercio de demostración para la hackathon Agents on Open Rails. Los turnos y precios son de ejemplo.",
+  "descripcion": "Demo venue for the Agents on Open Rails hackathon. The slots and prices are examples.",
   "utcOffsetMinutos": -180,
-  "recursos": ["Cancha 1", "Cancha 2"],
+  "recursos": ["Court 1", "Court 2"],
   "horarios": ["09:00", "10:30", "12:00", "17:00", "18:30", "20:00", "21:30"],
   "duracionMinutos": 90,
   "diasAdelante": 7,

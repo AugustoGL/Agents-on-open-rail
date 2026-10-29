@@ -1,7 +1,7 @@
 // Agente comprador de prueba: reserva un turno y paga la seña por x402 con su propia wallet.
 // Sirve para probar el cobro real en mainnet (con una wallet DISTINTA a la del agente).
 //
-//   npm run pay -- --url http://localhost:8402 --fecha 2026-10-21 --hora 20:00 --recurso "Cancha 1"
+//   npm run pay -- --url http://localhost:8402 --fecha 2026-10-21 --hora 20:00 --recurso "Court 1"
 //   npm run pay -- --url http://localhost:8402 --reserva S-ABC234
 //   Opciones: --max 10000 (tope en pesos)  --approve (habilita Permit2 si hace falta; cuesta gas)
 import { createWalletClient, http, formatUnits, erc20Abi, getAddress } from 'viem';
@@ -35,7 +35,7 @@ if (arg('reserva')) {
   if (!r.ok) { console.error('No existe esa reserva.'); process.exit(1); }
   reserva = (await r.json()).reserva;
 } else {
-  const body = { recurso: arg('recurso') ?? 'Cancha 1', fecha: arg('fecha'), hora: arg('hora'), cliente: { nombre: 'Agente comprador', wallet: buyer.address } };
+  const body = { recurso: arg('recurso') ?? 'Court 1', fecha: arg('fecha'), hora: arg('hora'), cliente: { nombre: 'Agente comprador', wallet: buyer.address } };
   if (!body.fecha || !body.hora) { console.error('Pasá --fecha YYYY-MM-DD y --hora HH:MM, o --reserva S-XXXXXX.'); process.exit(1); }
   const r = await fetch(`${base}/api/reservas`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const data = await r.json();

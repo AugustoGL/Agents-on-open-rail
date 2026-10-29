@@ -22,8 +22,8 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const corto = (s, n) => (String(s).length > n ? `${String(s).slice(0, n - 1)}…` : String(s));
 
 const ESTADOS = {
-  confirmada: { etiqueta: 'CONFIRMADA', fondo: '#1F6F54', pastilla: '#E1F2E9', texto: '#14573F', simbolo: '✓' },
-  jugada: { etiqueta: 'JUGADA', fondo: '#3B5370', pastilla: '#E3EAF2', texto: '#3B5370', simbolo: '⚑' },
+  confirmada: { etiqueta: 'CONFIRMED', fondo: '#1F6F54', pastilla: '#E1F2E9', texto: '#14573F', simbolo: '✓' },
+  jugada: { etiqueta: 'PLAYED', fondo: '#3B5370', pastilla: '#E3EAF2', texto: '#3B5370', simbolo: '⚑' },
 };
 
 /** La imagen del ticket (SVG chico). Todo texto que viene del comercio se escapa. */
@@ -32,7 +32,7 @@ export function ticketSvg({ negocio, recurso, cuando, sena, estado = 'confirmada
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" width="600" height="340">`
     + `<rect width="600" height="340" rx="28" fill="${e.fondo}"/>`
     + `<circle cx="600" cy="170" r="30" fill="#F6F3EC"/><circle cx="0" cy="170" r="30" fill="#F6F3EC"/>`
-    + `<text x="40" y="62" font-family="system-ui,sans-serif" font-size="20" font-weight="700" letter-spacing="3" fill="#ffffffcc">SEÑA · RESERVA</text>`
+    + `<text x="40" y="62" font-family="system-ui,sans-serif" font-size="20" font-weight="700" letter-spacing="3" fill="#ffffffcc">SEÑA · BOOKING</text>`
     + `<text x="40" y="118" font-family="system-ui,sans-serif" font-size="34" font-weight="800" fill="#ffffff">${esc(corto(recurso, 22))}</text>`
     + `<text x="40" y="160" font-family="system-ui,sans-serif" font-size="24" fill="#ffffff">${esc(corto(cuando, 30))}</text>`
     + `<text x="40" y="200" font-family="system-ui,sans-serif" font-size="20" fill="#ffffffdd">${esc(corto(negocio, 34))}</text>`
@@ -48,17 +48,17 @@ export function ticketMetadata({ negocio, recurso, cuando, inicioMs, sena, codig
   const e = ESTADOS[estado] ?? ESTADOS.confirmada;
   const svg = ticketSvg({ negocio, recurso, cuando, sena, estado, codigo });
   return {
-    name: `Reserva ${codigo} · ${recurso}`,
-    description: `Reserva de ${recurso} en ${negocio}: ${cuando}. Es un ticket intransferible: pertenece a la billetera que pagó la seña (${sena} en wARS).`,
+    name: `Booking ${codigo} · ${recurso}`,
+    description: `Booking for ${recurso} at ${negocio}: ${cuando}. It is a non-transferable ticket: it belongs to the wallet that paid the deposit (${sena} in wARS).`,
     image: `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`,
     ...(urlBase ? { external_url: `${urlBase.replace(/\/$/, '')}/pagar/${codigo}` } : {}),
     attributes: [
-      { trait_type: 'Comercio', value: negocio },
-      { trait_type: 'Cancha', value: recurso },
-      { trait_type: 'Turno', value: cuando },
-      { trait_type: 'Inicio', display_type: 'date', value: Math.floor(inicioMs / 1000) },
-      { trait_type: 'Seña', value: sena },
-      { trait_type: 'Estado', value: e.etiqueta[0] + e.etiqueta.slice(1).toLowerCase() },
+      { trait_type: 'Venue', value: negocio },
+      { trait_type: 'Court', value: recurso },
+      { trait_type: 'Slot', value: cuando },
+      { trait_type: 'Start', display_type: 'date', value: Math.floor(inicioMs / 1000) },
+      { trait_type: 'Deposit', value: sena },
+      { trait_type: 'Status', value: e.etiqueta[0] + e.etiqueta.slice(1).toLowerCase() },
     ],
   };
 }
@@ -76,7 +76,7 @@ const notSent = (err) => Object.assign(err, { notSent: true });
  */
 export function createNftClient({ contract, privateKey, red = 'celoSepolia', rpcUrl, tag, logger = console }) {
   const r = REDES_NFT[red];
-  if (!r) throw new Error(`NFT_CHAIN desconocida: ${red}. Usá celoSepolia, sepolia o celo.`);
+  if (!r) throw new Error(`Unknown NFT_CHAIN: ${red}. Use celoSepolia, sepolia or celo.`);
   const account = privateKeyToAccount(privateKey);
   const transport = http(rpcUrl ?? r.chain.rpcUrls.default.http[0]);
   const pub = createPublicClient({ chain: r.chain, transport });
@@ -94,7 +94,7 @@ export function createNftClient({ contract, privateKey, red = 'celoSepolia', rpc
     }
     const hash = await wallet.writeContract({ address, abi, functionName, args });
     const receipt = await pub.waitForTransactionReceipt({ hash, timeout: 90_000 });
-    if (receipt.status !== 'success') throw notSent(new Error(`La transacción ${hash} fue rechazada por el contrato.`));
+    if (receipt.status !== 'success') throw notSent(new Error(`Transaction ${hash} was rejected by the contract.`));
     logger.info?.(`[nft] ${functionName} ${hash}`);
     return { hash };
   }
@@ -118,18 +118,18 @@ export function createSimulatedNft({ red = 'celoSepolia', fallas = {} } = {}) {
   const bloqueados = new Set(); // ids que no se pueden emitir (para probar qué pasa cuando la cadena no responde)
   const llamadas = [];
   const falla = (nombre) => {
-    if ((fallas[nombre] ?? 0) > 0) { fallas[nombre] -= 1; throw notSent(new Error(`Falla simulada de ${nombre}`)); }
+    if ((fallas[nombre] ?? 0) > 0) { fallas[nombre] -= 1; throw notSent(new Error(`Simulated failure of ${nombre}`)); }
   };
   const tx = () => `0x${[...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
   const contract = '0x5e7A71c4e7000000000000000000000000000001';
   return {
-    simulated: true, red, redNombre: `${r.nombre} · simulado`, chainId: r.chain.id, testnet: true, contract, agentAddress: '0x000000000000000000000000000000000000A6E1',
+    simulated: true, red, redNombre: `${r.nombre} · simulated`, chainId: r.chain.id, testnet: true, contract, agentAddress: '0x000000000000000000000000000000000000A6E1',
     rpcUrl: r.chain.rpcUrls.default.http[0], explorador: r.explorador, moneda: r.chain.nativeCurrency,
     tokens, llamadas, fallas, bloqueados,
     urlToken: (tokenId) => r.token(r.explorador, contract, tokenId),
     urlTx: (hash) => `${r.explorador}/tx/${hash}`,
     async exists(tokenId) { return tokens.has(String(tokenId)); },
-    async mint({ to, tokenId, uri }) { falla('mint'); if (bloqueados.has(String(tokenId))) throw notSent(new Error('La cadena no respondió (simulado)')); if (tokens.has(String(tokenId))) throw notSent(new Error('YaExiste')); tokens.set(String(tokenId), { to: getAddress(to), uri }); llamadas.push(['mint', String(tokenId)]); return { hash: tx() }; },
+    async mint({ to, tokenId, uri }) { falla('mint'); if (bloqueados.has(String(tokenId))) throw notSent(new Error('The chain did not respond (simulated)')); if (tokens.has(String(tokenId))) throw notSent(new Error('YaExiste')); tokens.set(String(tokenId), { to: getAddress(to), uri }); llamadas.push(['mint', String(tokenId)]); return { hash: tx() }; },
     async setUri(tokenId, uri) { falla('setUri'); if (!tokens.has(String(tokenId))) throw notSent(new Error('NoExiste')); tokens.get(String(tokenId)).uri = uri; llamadas.push(['setUri', String(tokenId)]); return { hash: tx() }; },
     async burn(tokenId) { falla('burn'); if (!tokens.delete(String(tokenId))) throw notSent(new Error('NoExiste')); llamadas.push(['burn', String(tokenId)]); return { hash: tx() }; },
   };

@@ -24,7 +24,7 @@ export function readKey(name, hint = '') {
 }
 
 export function agentAccount() {
-  return privateKeyToAccount(readKey('AGENT_PRIVATE_KEY', 'Seguí la GUIA.md, paso 3.'));
+  return privateKeyToAccount(readKey('AGENT_PRIVATE_KEY', 'Seguí docs/GUIA.md, paso 3.'));
 }
 
 export function publicClient() {

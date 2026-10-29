@@ -1,90 +1,90 @@
 <!doctype html>
-<html lang="es-AR">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#F6F3EC" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#141411" media="(prefers-color-scheme: dark)">
-  <title>Reservá tu turno · Seña</title>
+  <title>Book your slot · Seña</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/css/sena.css">
 </head>
 <body>
-  <a class="saltar" href="#contenido">Saltar al contenido</a>
+  <a class="saltar" href="#contenido">Skip to content</a>
   <div id="carteles"></div>
   <div id="barra"></div>
 
   <main id="contenido" class="contenedor pila--grande">
-    <noscript><div class="aviso aviso-error"><div>Para reservar necesitás activar JavaScript en el navegador.</div></div></noscript>
+    <noscript><div class="aviso aviso-error"><div>To book you need to turn on JavaScript in your browser.</div></div></noscript>
 
     <section class="pila--grande" aria-labelledby="titulo">
       <div class="pila--chica">
-        <h1 id="titulo">Reservá tu turno</h1>
+        <h1 id="titulo">Book your slot</h1>
         <p id="negocio" class="apagado"></p>
       </div>
-      <ol class="pasos" id="pasos" aria-label="Pasos de la reserva">
-        <li aria-current="step">Turno</li><li>Tus datos</li><li>Pagar</li><li>Listo</li>
+      <ol class="pasos" id="pasos" aria-label="Booking steps">
+        <li aria-current="step">Slot</li><li>Your details</li><li>Pay</li><li>Done</li>
       </ol>
     </section>
 
     <section class="pila" aria-labelledby="t-turno">
-      <h2 id="t-turno">Elegí el día y el turno</h2>
-      <div id="dias" class="dias" role="group" aria-label="Días disponibles"></div>
+      <h2 id="t-turno">Pick the day and the slot</h2>
+      <div id="dias" class="dias" role="group" aria-label="Available days"></div>
       <div id="aviso" aria-live="polite"></div>
       <div id="turnos" aria-live="polite" aria-busy="true"></div>
       <p class="leyenda" id="leyenda" hidden>
-        <span>Verde: libre</span><span>Punteado: ocupado, podés anotarte en la lista de espera</span><span>Gris con candado: no disponible</span>
+        <span>Green: free</span><span>Dotted: taken, you can join the waitlist</span><span>Grey with a lock: unavailable</span>
       </p>
     </section>
 
     <section id="formulario" class="tarjeta tarjeta--realzada pila" aria-labelledby="t-form" hidden>
-      <h2 id="t-form" tabindex="-1">Tus datos</h2>
+      <h2 id="t-form" tabindex="-1">Your details</h2>
       <dl class="resumen">
-        <div><dt>Turno</dt><dd id="f-turno"></dd></div>
-        <div><dt>Seña</dt><dd id="f-sena"></dd></div>
-        <div><dt id="f-tiempo-t">Tiempo para pagar</dt><dd id="f-tiempo"></dd></div>
+        <div><dt>Slot</dt><dd id="f-turno"></dd></div>
+        <div><dt>Deposit</dt><dd id="f-sena"></dd></div>
+        <div><dt id="f-tiempo-t">Time to pay</dt><dd id="f-tiempo"></dd></div>
       </dl>
       <form id="f" class="pila" novalidate>
         <div class="campo">
-          <label for="f-nombre">Tu nombre</label>
+          <label for="f-nombre">Your name</label>
           <input id="f-nombre" class="input" autocomplete="name" maxlength="60" required aria-describedby="f-nombre-error">
           <div id="f-nombre-error"></div>
         </div>
         <div class="campo">
-          <label for="f-contacto">Contacto <span class="opcional">(opcional)</span></label>
-          <input id="f-contacto" class="input" autocomplete="tel" maxlength="80" placeholder="Teléfono, mail o @usuario">
-          <span class="ayuda">Solo lo ve el comercio, por si hay que avisarte algo del turno.</span>
+          <label for="f-contacto">Contact <span class="opcional">(optional)</span></label>
+          <input id="f-contacto" class="input" autocomplete="tel" maxlength="80" placeholder="Phone, email or @username">
+          <span class="ayuda">Only the venue sees it, in case we need to tell you something about the slot.</span>
         </div>
         <div id="f-error"></div>
         <div class="pila--chica">
-          <button id="f-ok" class="btn btn-primario btn-grande btn-bloque" type="submit">Reservar y pagar la seña</button>
-          <button id="f-cancelar" class="btn btn-fantasma btn-bloque" type="button">Elegir otro turno</button>
+          <button id="f-ok" class="btn btn-primario btn-grande btn-bloque" type="submit">Book and pay the deposit</button>
+          <button id="f-cancelar" class="btn btn-fantasma btn-bloque" type="button">Pick another slot</button>
         </div>
       </form>
       <details>
-        <summary>¿Qué pasa si cancelo?</summary>
+        <summary>What happens if I cancel?</summary>
         <ul id="politica" class="pila--chica"></ul>
       </details>
     </section>
 
     <section class="pila" aria-labelledby="t-como">
-      <h2 id="t-como">¿Cómo funciona?</h2>
+      <h2 id="t-como">How does it work?</h2>
       <ol class="pila--chica">
-        <li><strong>Elegís el turno</strong> y dejás tu nombre.</li>
-        <li><strong>Pagás una seña</strong> desde tu billetera (<span id="como-token">en wARS, el peso argentino digital</span>). Tenés unos minutos para hacerlo.</li>
-        <li><strong>Listo:</strong> el turno queda confirmado. Si cancelás a tiempo, te devolvemos la seña.</li>
+        <li><strong>Pick the slot</strong> and leave your name.</li>
+        <li><strong>Pay a deposit</strong> from your wallet (<span id="como-token">in wARS, the digital Argentine peso</span>). You have a few minutes to do it.</li>
+        <li><strong>Done:</strong> the slot is confirmed. If you cancel in time, we refund the deposit.</li>
       </ol>
     </section>
 
     <section id="mis-reservas" class="pila" aria-labelledby="t-mis">
-      <h2 id="t-mis" tabindex="-1">Mis reservas</h2>
+      <h2 id="t-mis" tabindex="-1">My bookings</h2>
       <div id="billetera"></div>
       <div id="mis" aria-live="polite"></div>
     </section>
 
     <footer class="apagado chica pila--chica">
-      <p><a href="/decisiones">Mirá qué decide el agente por su cuenta</a>.</p>
-      <p>¿Sos un agente de IA? Reservá y pagá por la API: empezá por <code>GET /api/turnos</code>.</p>
+      <p><a href="/decisiones">See what the agent decides on its own</a>.</p>
+      <p>Are you an AI agent? Book and pay through the API: start with <code>GET /api/turnos</code>.</p>
     </footer>
   </main>
   <script type="module" src="/static/reservar.js"></script>

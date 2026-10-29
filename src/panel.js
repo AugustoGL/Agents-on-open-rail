@@ -62,7 +62,7 @@ export function createRateLimit({ windowMs, max, now = Date.now }) {
     if (hits.size > 5000) for (const [k, v] of hits) if (t - v.since >= windowMs) hits.delete(k);
     if (h.count > max) {
       res.set('Retry-After', String(Math.ceil((h.since + windowMs - t) / 1000)));
-      return res.status(429).json({ error: 'Demasiados pedidos seguidos. Esperá unos minutos y probá de nuevo.', codigo: 'demasiados_pedidos' });
+      return res.status(429).json({ error: 'Too many requests in a row. Wait a few minutes and try again.', codigo: 'demasiados_pedidos' });
     }
     return next();
   };
@@ -127,13 +127,13 @@ export function createPanelRouter({
     res.json({
       habilitado: enabled, autenticado: Boolean(s), csrf: s?.csrf ?? null,
       negocio: agent.business.nombre, modo: agent.chain.mode, nft: Boolean(agent.nft), esDemostracion: Boolean(agent.business.esDemostracion),
-      mensaje: enabled ? null : 'El panel está deshabilitado: falta OWNER_DASHBOARD_PASSWORD en el archivo .env.',
+      mensaje: enabled ? null : 'The dashboard is disabled: OWNER_DASHBOARD_PASSWORD is missing from the .env file.',
     });
   });
 
   router.use('/api', (req, res, next) => {
-    if (!enabled) return res.status(503).json({ error: 'El panel está deshabilitado: falta OWNER_DASHBOARD_PASSWORD en el archivo .env.', codigo: 'panel_deshabilitado' });
-    if (!sameOrigin(req)) return res.status(403).json({ error: 'Pedido de otro origen.', codigo: 'origen' });
+    if (!enabled) return res.status(503).json({ error: 'The dashboard is disabled: OWNER_DASHBOARD_PASSWORD is missing from the .env file.', codigo: 'panel_deshabilitado' });
+    if (!sameOrigin(req)) return res.status(403).json({ error: 'Request from another origin.', codigo: 'origen' });
     return next();
   });
 
@@ -142,14 +142,14 @@ export function createPanelRouter({
     const wait = Math.max(perIp.blockedFor(ip), total.blockedFor('todas'));
     if (wait > 0) {
       res.set('Retry-After', String(wait));
-      return res.status(429).json({ error: `Demasiados intentos. Probá de nuevo en ${Math.ceil(wait / 60)} minuto(s).`, codigo: 'demasiados_intentos' });
+      return res.status(429).json({ error: `Too many attempts. Try again in ${Math.ceil(wait / 60)} minute(s).`, codigo: 'demasiados_intentos' });
     }
     const given = req.body?.clave;
     if (typeof given !== 'string' || given.length > 200 || !safeEqual(given, password)) {
       perIp.fail(ip);
       total.fail('todas');
       logger.warn?.(`[panel] intento de ingreso fallido desde ${ip}`);
-      return res.status(401).json({ error: 'La clave no es correcta.', codigo: 'clave' });
+      return res.status(401).json({ error: 'The password is not correct.', codigo: 'clave' });
     }
     perIp.reset(ip);
     sweep();
@@ -163,10 +163,10 @@ export function createPanelRouter({
   // Todo lo que sigue necesita sesión; lo que cambia datos, además, el token CSRF.
   router.use('/api', (req, res, next) => {
     const s = sessionOf(req);
-    if (!s) return res.status(401).json({ error: 'Ingresá con la clave del panel.', codigo: 'sin_sesion' });
+    if (!s) return res.status(401).json({ error: 'Sign in with the dashboard password.', codigo: 'sin_sesion' });
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       const sent = req.get('x-csrf-token');
-      if (typeof sent !== 'string' || !safeEqual(sent, s.csrf)) return res.status(403).json({ error: 'Falta el token de seguridad (CSRF). Recargá la página.', codigo: 'csrf' });
+      if (typeof sent !== 'string' || !safeEqual(sent, s.csrf)) return res.status(403).json({ error: 'The security token (CSRF) is missing. Reload the page.', codigo: 'csrf' });
     }
     req.panelSession = s;
     return next();
@@ -202,7 +202,7 @@ export function createPanelRouter({
 
   router.get('/api/reservas/:id', (req, res) => {
     const b = agent.store.getBooking(req.params.id);
-    if (!b) return res.status(404).json({ error: 'No existe esa reserva.' });
+    if (!b) return res.status(404).json({ error: 'That booking does not exist.' });
     const view = (p) => (p.ok ? { ok: true, devolucion: formatArs(p.refundWei), regla: p.rule, motivo: p.reason } : { ok: false, motivo: p.reason });
     return res.json({
       reserva: agent.bookingSummary(b),
@@ -236,7 +236,7 @@ export function createPanelRouter({
     const rows = ['needs_owner', 'failed', 'unknown'].flatMap((s) => agent.store.transfersByStatus(s));
     res.json({
       transferencias: rows.map((t) => ({
-        id: t.id, tipo: t.kind === 'refund' ? 'devolución' : 'retiro', reserva: t.booking_id, destino: t.to_address, monto: money(t.amount_wei),
+        id: t.id, tipo: t.kind === 'refund' ? 'refund' : 'withdrawal', reserva: t.booking_id, destino: t.to_address, monto: money(t.amount_wei),
         estado: t.status, nota: t.note, error: t.error, puedeAprobar: ['needs_owner', 'failed'].includes(t.status), creada: new Date(t.created_at).toISOString(),
       })),
     });
@@ -263,7 +263,7 @@ export function createPanelRouter({
       modo: agent.chain.mode,
       direccionDeRetiro: maskAddress(agent.payoutAddress),
       billeteraDelAgente: agent.chain.address,
-      aviso: 'La dirección de retiro, las claves, PAY_TO y el modo se cambian solo en el archivo .env, por seguridad.',
+      aviso: 'The withdrawal address, keys, PAY_TO and the mode are changed only in the .env file, for security.',
     },
     historial: agent.store.settingsLog({ limit: 60 }).map((r) => ({
       id: r.id, fecha: new Date(r.at).toISOString(), quien: r.actor, campo: r.field, antes: r.old_value, despues: r.new_value,
@@ -272,7 +272,7 @@ export function createPanelRouter({
   router.get('/api/config', (_req, res) => res.json(configView()));
   router.put('/api/config', (req, res) => {
     const r = agent.updateSettings(req.body?.cambios, { actor: 'panel', ip: req.ip });
-    if (!r.ok) return res.status(400).json({ error: 'No se guardó: revisá los campos marcados.', errores: r.errors });
+    if (!r.ok) return res.status(400).json({ error: 'Not saved: check the marked fields.', errores: r.errors });
     return res.json({ ok: true, cambios: r.changes.map((c) => c.field), ...configView() });
   });
 
@@ -287,7 +287,7 @@ export function createPanelRouter({
   }));
   router.post('/api/bloqueos', (req, res) => {
     const r = agent.createBlock(req.body ?? {}, { actor: 'panel', ip: req.ip });
-    if (!r.ok) return res.status(400).json({ error: 'No se creó el bloqueo: revisá los campos marcados.', errores: r.errors });
+    if (!r.ok) return res.status(400).json({ error: 'The block was not created: check the marked fields.', errores: r.errors });
     return res.status(201).json({ ok: true, bloqueo: blockView(r.block) });
   });
   router.delete('/api/bloqueos/:id', (req, res) => {
@@ -309,7 +309,7 @@ export function createPanelRouter({
     res.json({ ok: true, reporte: report });
   }));
 
-  router.use((_req, res) => res.status(404).json({ error: 'No existe esa ruta del panel.' }));
+  router.use((_req, res) => res.status(404).json({ error: 'That dashboard route does not exist.' }));
   return router;
 }
 

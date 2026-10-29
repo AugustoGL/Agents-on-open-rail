@@ -1,19 +1,19 @@
-// Entender mensajes en castellano ("¿hay cancha mañana a las 21?", "cancelá S-ABC123").
+// Entender mensajes en castellano o en inglés ("¿hay cancha mañana a las 21?", "is there a court tomorrow at 9 pm?", "cancel S-ABC123").
 // El modelo de lenguaje (opcional) solo INTERPRETA el pedido y devuelve una intención.
 // Lo que se hace con esa intención (reservar, cobrar, devolver) lo decide el código del agente.
 import { localDateStr, addDays } from './time.js';
 
 export const ACTIONS = ['reservar', 'ver_turnos', 'mis_reservas', 'cancelar', 'lista_espera', 'politica', 'ayuda', 'otro'];
 
-const DIAS = { domingo: 0, lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6 };
+const DIAS = { domingo: 0, lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6, sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
 
 const strip = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 function parseDate(t, { now, offset }) {
   const today = localDateStr(now, offset);
-  if (/pasado manana/.test(t)) return addDays(today, 2);
-  if (/\bmanana\b/.test(t)) return addDays(today, 1);
-  if (/\bhoy\b|esta noche|esta tarde/.test(t)) return today;
+  if (/pasado manana|day after tomorrow/.test(t)) return addDays(today, 2);
+  if (/\bmanana\b|\btomorrow\b/.test(t)) return addDays(today, 1);
+  if (/\bhoy\b|esta noche|esta tarde|\btoday\b|\btonight\b|this (evening|afternoon)/.test(t)) return today;
   const dm = /\b(\d{1,2})\/(\d{1,2})\b/.exec(t);
   if (dm) {
     const [y] = today.split('-');
@@ -32,13 +32,13 @@ function parseDate(t, { now, offset }) {
 
 function parseTime(t) {
   // "21", "21:30", "21.30", "21hs", "a las 9", "9 de la noche"
-  const m = /(?:a las |las |\b)(\d{1,2})(?:[:.h](\d{2}))?\s*(?:hs|h|horas)?\b(\s*de la (?:noche|tarde))?/.exec(t.replace(/s-[a-z0-9]{6}/g, ''));
+  const m = /(?:a las |las |at |\b)(\d{1,2})(?:[:.h](\d{2}))?\s*(?:hs|h|horas)?\b(\s*(?:de la (?:noche|tarde)|p\.?m\b))?/.exec(t.replace(/s-[a-z0-9]{6}/g, ''));
   if (!m) return null;
   let h = Number(m[1]);
   const min = m[2] ? Number(m[2]) : 0;
   if (m[3] && h < 12) h += 12;
   if (h > 23 || min > 59) return null;
-  if (!m[2] && !/a las|las |hs|h\b|horas|de la/.test(m[0]) && (h < 7)) return null;
+  if (!m[2] && !/a las|las |at |hs|h\b|horas|de la|p\.?m/.test(m[0]) && (h < 7)) return null;
   return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
@@ -46,23 +46,24 @@ function parseTime(t) {
 export function parseIntentHeuristic(text, { now, offset, business }) {
   const t = strip(text);
   const id = /\bs-[a-z0-9]{6}\b/.exec(t)?.[0]?.toUpperCase() ?? null;
-  const recursoIdx = business.recursos.findIndex((r) => t.includes(strip(r)));
+  const num = /\b(?:cancha|court)\s*(\d+)\b/.exec(t)?.[1]; // "cancha 2" / "court 2" also match a court named "Court 2"
+  const recursoIdx = business.recursos.findIndex((r) => t.includes(strip(r)) || (num && new RegExp(`\\b${num}$`).test(strip(r))));
   const base = { fecha: parseDate(t, { now, offset }), hora: parseTime(t), recurso: recursoIdx >= 0 ? business.recursos[recursoIdx] : null, reservaId: id };
 
-  if (/cancel|anul|dar de baja|no (voy|vamos|puedo ir)/.test(t)) return { accion: id ? 'cancelar' : 'mis_reservas', ...base };
-  if (/mis (reservas|turnos)|que reserv|tengo (reserva|turno)/.test(t)) return { accion: 'mis_reservas', ...base };
-  if (/lista de espera|anotame|avisame si se libera/.test(t)) return { accion: 'lista_espera', ...base };
-  if (/politica|devolu|reembols|como funciona|cuanto (sale|cuesta)|precio|sena/.test(t)) return { accion: 'politica', ...base };
-  if (/reserv|turno|cancha|jugar|lugar|libre|disponib|hay (algo|para)/.test(t) || base.fecha || base.hora) {
+  if (/cancel|anul|dar de baja|no (voy|vamos|puedo ir)|(can'?t|cannot|won'?t) (make|come|go|attend)/.test(t)) return { accion: id ? 'cancelar' : 'mis_reservas', ...base };
+  if (/mis (reservas|turnos)|que reserv|tengo (reserva|turno)|my (bookings?|reservations?|slots?)|what (do i|did i) (have|book)/.test(t)) return { accion: 'mis_reservas', ...base };
+  if (/lista de espera|anotame|avisame si se libera|wait ?list|notify me|let me know if/.test(t)) return { accion: 'lista_espera', ...base };
+  if (/politica|devolu|reembols|como funciona|cuanto (sale|cuesta)|precio|sena|polic(y|ies)|refund|how (does it work|much)|price|deposit|\bcost/.test(t)) return { accion: 'politica', ...base };
+  if (/reserv|turno|cancha|jugar|lugar|libre|disponib|hay (algo|para)|\bbook|\bslot|\bcourt|\bplay|available|\bfree\b|anything/.test(t) || base.fecha || base.hora) {
     return { accion: base.fecha && base.hora ? 'reservar' : 'ver_turnos', ...base };
   }
-  if (/^(hola|buenas|buen dia|buenas tardes|buenas noches|ayuda|help|menu)\b/.test(t)) return { accion: 'ayuda', ...base };
+  if (/^(hola|buenas|buen dia|buenas tardes|buenas noches|ayuda|help|menu|hello|hi|hey|good (morning|afternoon|evening))\b/.test(t)) return { accion: 'ayuda', ...base };
   return { accion: 'otro', ...base };
 }
 
 const TOOL = {
   name: 'interpretar_pedido',
-  description: 'Clasifica el pedido del cliente de un complejo deportivo y extrae los datos. No decide nada sobre plata.',
+  description: 'Classify the request of a sports-venue customer and extract the data. It decides nothing about money.',
   input_schema: {
     type: 'object',
     properties: {
@@ -71,7 +72,7 @@ const TOOL = {
       hora: { type: ['string', 'null'], description: 'Hora local HH:MM o null' },
       recurso: { type: ['string', 'null'] },
       reservaId: { type: ['string', 'null'], description: 'Id de reserva tipo S-ABC123 o null' },
-      respuesta: { type: ['string', 'null'], description: 'Respuesta corta y amable en castellano rioplatense si accion es "otro" o "ayuda"' },
+      respuesta: { type: ['string', 'null'], description: 'Short, friendly reply in the customer\'s language (English or Spanish) if accion is "otro" or "ayuda"' },
     },
     required: ['accion'],
   },
@@ -85,9 +86,9 @@ export function createClaudeInterpreter({ apiKey, model = 'claude-haiku-5-5', fe
   return async function interpretWithClaude(text, { now, offset, business }) {
     const today = localDateStr(now, offset);
     const system = [
-      `Sos el asistente de reservas de "${business.nombre}". Hoy es ${today} (hora de Argentina).`,
-      `Recursos: ${business.recursos.join(', ')}. Horarios de inicio: ${business.horarios.join(', ')}.`,
-      'Solo interpretás el pedido con la herramienta. Nunca prometés devoluciones ni montos: eso lo decide el sistema.',
+      `You are the booking assistant of "${business.nombre}". Today is ${today} (Argentina time).`,
+      `Courts: ${business.recursos.join(', ')}. Start times: ${business.horarios.join(', ')}.`,
+      'You only interpret the request with the tool. You never promise refunds or amounts: the system decides that. Customers write in English or Spanish.',
     ].join(' ');
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);

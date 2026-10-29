@@ -1,10 +1,19 @@
-# Pendientes — lo que tenés que hacer vos
+# Mis deberes
 
-Todo lo que falta es tuyo porque necesita **tus claves, tu plata de prueba, tu cuenta o tu gente**. El código, los tests (139), el panel, la web, el NFT y la documentación ya están hechos.
+Lo que **solo vos podés hacer**: necesita tus claves, tu plata de prueba, tus cuentas o tu gente. Todo lo demás ya está hecho (código, pruebas, interfaz en inglés, documentación, video).
 
-**Fecha límite de la entrega: lunes 9 de noviembre de 2026, 9:00 (Abidjan) = 6:00 de la mañana en Córdoba.** Mandalo con un día de margen: **el domingo 8**.
+**Fecha límite: lunes 9 de noviembre de 2026, 9:00 (Abidjan) = 6:00 en Córdoba.** Mandalo con un día de margen: **el domingo 8**. Las casillas **🔴** bloquean la entrega.
 
-Marcá cada casilla a medida que avances. Las que dicen **🔴** bloquean la entrega.
+## Ya está hecho (no hace falta tocar)
+
+- [x] Repo **público** en GitHub.
+- [x] **Video** subido a YouTube.
+- [x] **Entrega cargada** en Loops con el link del repo y el del video.
+- [x] Código, **139 pruebas** y prueba de navegador real; interfaz, mensajes del agente y bot en **inglés** (el bot entiende inglés y español).
+- [x] Verifiqué que el **modelo de lenguaje no decide plata**: Claude solo interpreta mensajes del bot (opcional, `src/nl.js`); los montos los calcula código fijo (`src/policy.js`). Lo que dice el video ("no improvisa") es cierto.
+- [x] Textos de la entrega **en inglés** listos para pegar: `docs/ENTREGA.md` (sección 2, "English version").
+
+**Lo único que no hice: los subtítulos como archivos `.srt`** (inglés y español). Están quemados en el video; si los querés aparte para YouTube, pedímelos.
 
 ---
 
@@ -12,23 +21,29 @@ Marcá cada casilla a medida que avances. Las que dicen **🔴** bloquean la ent
 
 | Cuándo | Qué |
 |---|---|
-| **Hoy / mañana** | 1. Subir el código · 2. NFT en Sepolia · 3. Servidor fijo |
+| **Hoy** | 0. Subir los cambios · 2. NFT en Sepolia · 3. Servidor fijo |
 | **Esta semana** | 4. Mainnet y primeros pagos con tag · 5. Probar con billetera real · 6. Telegram |
 | **Semana próxima** | 7. Uso real (comercio + compradores) · 8. Preguntas a Ripio/organizadores |
-| **Hasta el sábado 7** | 9. Video y capturas finales · 10. Cargar la entrega en Loops (ver `ENTREGA.md`) |
-| **Domingo 8** | 11. Chequeo final y envío |
+| **Hasta el sábado 7** | 9. Actualizar la entrega con las pruebas reales |
+| **Domingo 8** | 10. Chequeo final y envío |
 
 ---
 
-## 1. Subir el código a GitHub 🔴
+## 0. Hoy: subir los cambios 🔴
 
-El `agent.json` tiene que estar público para registrar la identidad ERC-8004, y el repo tiene que ser público para la entrega.
+La entrega apunta a tu repo público, y ese repo todavía **no tiene** lo último (hay commits solo locales).
 
-- [ ] `git status` limpio y **`.env` sin aparecer** (está en `.gitignore`; si aparece, frená).
-- [ ] `git push` (los commits están hechos, solo locales).
+- [ ] `git push` (el commit con la interfaz en inglés, el video y el orden del repo ya lo hice yo).
 - [ ] Verificá que se ve: `curl -s https://raw.githubusercontent.com/AugustoGL/Agents-on-open-rail/main/agent.json`
-- [ ] Opcional: sacar del repo `sena.zip` y `cloudflared.deb` (ya no hacen falta; el `.deb` ni está commiteado).
 - [ ] Revisá que no haya secretos en el historial: `git log -p | grep -iE "private|secret|api_key"` (no debería salir ninguna clave).
+- [ ] **Reiniciá el servidor de la demo pública** (ngrok): sigue sirviendo la versión anterior, en español, y es lo que va a abrir el jurado.
+- [ ] **Resembrá la base de la demo**: la actual tiene decisiones viejas en español y canchas llamadas `Cancha 1`/`Cancha 2`. Usá `npm run seed -- --reset` (base de demo nueva, en inglés) o renombrá las canchas en **Settings** del panel. Las decisiones viejas no se traducen solas.
+- [ ] Si la entrega en Loops tiene textos en español, **actualizala** con los de `docs/ENTREGA.md` (sección 2, "English version") usando el borrador de la sección 8 de ese archivo (`loops project update ...` sin `--confirm`, y después con `--confirm`).
+- [ ] Mirá `Proyectos importantes/_archivo-sena/` (el zip viejo, el instalador de cloudflared y el guion anterior). Si no los querés, borrala.
+
+## 1. Cosas del repo que ya hice
+
+El repo está ordenado: guías en `docs/`, salidas del video fuera de git (`video/out/`), nada sensible. No tenés que hacer nada acá.
 
 ## 2. NFT en Celo Sepolia (≈ 10 minutos)
 
@@ -41,7 +56,7 @@ El contrato está compilado y probado en una EVM local. Falta desplegarlo con **
 - [ ] Poné `NFT_CONTRACT=<dirección>` y `NFT_CHAIN=celoSepolia` en el `.env`, reiniciá `npm start`. Tiene que decir `Ticket NFT: Celo Sepolia (testnet) · contrato 0x…`.
 - [ ] `npm run nft:probar -- --to 0xTuBilletera --quemar` (ciclo completo: emitido → jugado → quemado). Guardá los links del explorador.
 - [ ] Agregá la red Celo Sepolia a MetaMask y mirá el ticket de `npm run nft:probar -- --to 0xTuBilletera` (sin `--quemar`).
-- [ ] Anotá la dirección del contrato: va en `ENTREGA.md`.
+- [ ] Anotá la dirección del contrato: va en `docs/ENTREGA.md`.
 
 > **Ojo:** la puntuación del hackathon cuenta **solo Celo mainnet**. El NFT en Sepolia sirve para mostrar el flujo, pero no suma. Si querés que cada ticket sea una transacción tuya con tag en mainnet, mirá el punto 4.4.
 
@@ -99,12 +114,13 @@ Hasta ahora solo probé con billeteras simuladas. Hacé este recorrido en **Meta
 
 ## 6. Telegram
 
-El bot **no se tocó** en esta etapa. Verificá que anda con el panel nuevo.
+Las respuestas del bot ahora están **en inglés** y entiende mensajes en inglés y español. Las pruebas pasan, pero **nunca se probó con un token real**.
 
 - [ ] @BotFather → `/newbot` → token en `TELEGRAM_BOT_TOKEN`.
 - [ ] `/quiensoy` al bot → tu chat id en `OWNER_CHAT_ID`.
 - [ ] Probá: reservar, pagar (link https), cancelar, `/hoy`, `/decisiones`, `/pendientes`, `/aprobar`.
-- [ ] Confirmá que llega el aviso "tu reserva ya está en tu billetera como NFT".
+- [ ] Escribile en inglés ("is there a court tomorrow at 9 pm?") y en español ("¿hay cancha mañana a las 21?").
+- [ ] Confirmá que llega el aviso "Your booking … is now in your wallet as an NFT".
 
 ## 7. Uso real 🔴 (pesa mucho en la nota)
 
@@ -115,7 +131,7 @@ Los criterios piden **un comercio real, personas reales y un camino para crecer*
 - [ ] Cargá el comercio real en el panel (nombre, canchas, horarios, precios) y cambiá `esDemostracion` en `config/negocio.json` **solo si ya no es una demo** (si sigue siendo demo, dejalo: el cartel es honesto).
 - [ ] Anotá números: reservas, señas cobradas, devoluciones, cuántos fueron personas que no conocés, cuánto tiempo le ahorra al dueño.
 - [ ] Pedile al dueño una frase o un audio corto para el video.
-- [ ] Si los primeros compradores son conocidos, **decilo abiertamente** en la entrega (está previsto en `ENTREGA.md`).
+- [ ] Si los primeros compradores son conocidos, **decilo abiertamente** en la entrega (está previsto en `docs/ENTREGA.md`).
 
 ## 8. Preguntas a Ripio y organizadores (office hours)
 
@@ -127,15 +143,25 @@ Los criterios piden **un comercio real, personas reales y un camino para crecer*
 - [ ] ¿Hay un faucet de CELO sin Self para cargar la billetera del agente?
 - [ ] **Una consulta profesional** (abogado/contador) sobre recibir pesos o cripto de terceros en Argentina. El diseño evita que el agente toque pesos, pero conviene confirmarlo.
 
-## 9. Video y capturas finales
+## 9. Video: ya está en YouTube
 
-- [ ] Grabá la demo de 2 a 3 minutos siguiendo el guion de `ENTREGA.md` (sección 5).
-- [ ] `npm run capturas` en el último momento, para que las capturas de `docs/capturas/` muestren la versión final.
-- [ ] Subí el video (YouTube "no listado" o similar) y probá el link en una ventana de incógnito.
+- [ ] Confirmá que el **link del video en la entrega** abre en una ventana de incógnito y que el audio suena.
+- [ ] Si cambiaste algún número de la política (24 h, 6 h, 50 %, $20.000), **avisame** y regenero el video (`npm run video`).
+- [ ] Si querés sumar la **demo en pantalla de 2 a 3 minutos** (guion en `docs/ENTREGA.md`, sección 5): el animado explica la idea; la demo real prueba que funciona.
+- [ ] `npm run capturas` en el último momento, para que `docs/capturas/` muestre la versión final.
 
-## 10 y 11. Entrega
+## 10. Chequeo final y envío (domingo 8)
 
-Todo está en **`ENTREGA.md`**: textos para copiar, evidencia a juntar, comandos de Loops (borrador primero, `--confirm` después) y el chequeo final.
+Está todo en **`docs/ENTREGA.md`**, sección 9: textos, evidencia (hashes, comprobantes), comandos de Loops (borrador primero, `--confirm` después) y el chequeo final.
+
+---
+
+## Cosas que dejé anotadas
+
+- El bot de Telegram **nunca se probó con un token real** (las pruebas usan uno simulado). Es el punto 6.
+- "Ver mis reservas con la billetera" solo sirve con billeteras comunes (EOA), no con billeteras de contrato.
+- Las **fuentes del video** salen de las que tenga la máquina que lo renderiza. Si lo vas a regenerar en otra compu, instalá Inter.
+- El NFT de testnet no suma puntos (solo cuenta Celo mainnet).
 
 ---
 

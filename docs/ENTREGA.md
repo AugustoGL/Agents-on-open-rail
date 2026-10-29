@@ -13,12 +13,12 @@ Todo lo que hay que juntar y pegar para la entrega. Track: **Stable Agents: LatA
 | 1 | Código | Repo público de GitHub | ✅ commiteado — falta `git push` |
 | 2 | Proyecto cargado en Loops House | `loops project create` / web (ver §8) | ⬜ |
 | 3 | **Billetera del agente** (campo obligatorio `agent-wallet`) | Formulario | ⬜ confirmar con `npm run address` |
-| 4 | Demo en vivo (URL fija) | Servidor propio | ⬜ ver `PENDIENTES.md` §3 |
+| 4 | Demo en vivo (URL fija) | Servidor propio | ⬜ ver `MIS-DEBERES.md` §3 |
 | 5 | Video de la demo (2–3 min) | YouTube no listado u otro | ⬜ ver §5 |
 | 6 | Identidad ERC-8004 registrada | Desde la billetera del agente | ⬜ `npm run register -- --send` |
 | 7 | Transacciones en **Celo mainnet con tu tag** | Celoscan | ⬜ ver §4 |
-| 8 | Usuarios reales (comercio + compradores) | Números y frases | ⬜ ver `PENDIENTES.md` §7 |
-| 9 | Documentación | `README.md`, `GUIA.md`, `docs/capturas/` | ✅ |
+| 8 | Usuarios reales (comercio + compradores) | Números y frases | ⬜ ver `MIS-DEBERES.md` §7 |
+| 9 | Documentación | `README.md`, `docs/GUIA.md`, `docs/capturas/` | ✅ |
 | 10 | Evaluación contra los criterios | `loops evaluate` | ⬜ ver §8 |
 
 ---
@@ -46,16 +46,55 @@ Todo lo que hay que juntar y pegar para la entrega. Track: **Stable Agents: LatA
 > - Al cerrar el día retira al dueño solo lo que ya no está comprometido en turnos futuros.
 > - Cada decisión queda registrada con la regla aplicada y su transacción, en un registro público sin datos personales.
 >
-> **La reserva es de quien pagó.** Desde "Mis reservas" la persona firma un mensaje de un solo uso (sin gas) y ve y cancela las reservas pagadas con su billetera desde cualquier dispositivo; la seña vuelve a la misma billetera. Además el agente le manda un **NFT intransferible** (ERC-721 + ERC-5192) con los datos del turno: se quema al cancelar y pasa a "jugada" cuando se juega. Un agente de IA que pagó por x402 puede consultar sus reservas del mismo modo.
+> **La reserva es de quien pagó.** Desde "My bookings" la persona firma un mensaje de un solo uso (sin gas) y ve y cancela las reservas pagadas con su billetera desde cualquier dispositivo; la seña vuelve a la misma billetera. Además el agente le manda un **NFT intransferible** (ERC-721 + ERC-5192) con los datos del turno: se quema al cancelar y pasa a "jugada" cuando se juega. Un agente de IA que pagó por x402 puede consultar sus reservas del mismo modo.
 >
 > **Para el comercio.** Un panel con el día, el calendario por cancha, las reservas, las devoluciones pendientes, los bloqueos (feriados, mantenimiento), el registro de decisiones y la configuración (precio, seña, horarios, política y topes), todo con historial de cambios. Los cambios valen para reservas nuevas: cada reserva conserva la seña y la política con las que se pagó.
 >
 > **Stack de Celo.** wARS (Ripio), x402 con el facilitador de Celo (Permit2), ERC-8021 (todas las transacciones del agente llevan el tag), ERC-8004 (identidad del agente), fee abstraction opcional y un ERC-721 intransferible propio.
 >
-> **Cómo se prueba.** Hay una demo con "Pagar de prueba" para recorrer todo sin billetera ni plata, un panel y un registro público de decisiones. Otros agentes pueden reservar y pagar por API (`GET /api/turnos` → `POST /api/reservas` → pago x402).
+> **Cómo se prueba.** Hay una demo con "Pay as a test" para recorrer todo sin billetera ni plata, un panel y un registro público de decisiones. Otros agentes pueden reservar y pagar por API (`GET /api/turnos` → `POST /api/reservas` → pago x402).
 
 ### Descripción corta (EN)
 > Seña is an autonomous deposit agent for appointment-based businesses in Argentina. It collects booking deposits in wARS on Celo via x402 (Permit2, gasless for the payer), applies a deterministic cancellation policy (full refund, partial refund, or keep the deposit and refund it if the slot is resold), re-offers freed slots to a waitlist, escalates large refunds to the owner, and settles the day. Customers book via Telegram, web or API; the paying wallet owns the booking — it can see and cancel it by signing a gasless message and receives an untransferable ERC-721 ticket (burned on cancellation). Every agent transaction carries its ERC-8021 tag and the agent has an ERC-8004 identity. Every decision is logged publicly with the rule applied.
+
+### English version of the form texts (copy & paste — the form is in English)
+
+**Name:** Seña
+
+**Tagline:** An agent that collects booking deposits in Argentine pesos (wARS), decides on its own what to do with every cancellation, and hands the booking to whoever paid.
+
+**Short pitch:**
+> In Argentina, businesses that run on appointments (sports courts, hair salons, clinics) lose money and time on no-shows, and collecting a deposit by hand is a mess. **Seña** is an agent that collects the deposit in **wARS** (Ripio's Argentine peso) over **x402** on **Celo**, applies a cancellation policy with fixed rules (full refund, partial refund, or keep it), offers the freed slot to a waitlist, **refunds the person who cancelled if the slot is resold**, and closes the books every night. Customers book on Telegram, on the web or through an API, and the booking belongs to the wallet that paid: it can see and cancel it by signing a gasless message, and it receives a non-transferable NFT as a ticket. The owner runs everything from a dashboard and can audit every decision the agent made.
+
+**Long description:**
+> **The problem.** A business that lives on appointments loses revenue to no-shows and last-minute cancellations. Asking for a deposit helps, but collecting it, refunding it by the rules and re-assigning the slot is manual work and causes arguments.
+>
+> **What Seña does.** It is an agent that handles other people's money with deterministic, auditable rules, without the owner stepping in:
+> - Collects the deposit in wARS over x402 (Permit2: the customer signs and pays no gas).
+> - Applies the venue's cancellation policy: more than 24 h ahead → full refund; between 6 and 24 h → partial refund and the slot is offered on; under 6 h → the deposit is kept and, **if the slot is resold, it is refunded**.
+> - Releases the slot if nobody pays in time, offers freed slots to the waitlist, and accepts late payments only if the slot is still free.
+> - On a large refund, or many in one day, it **does not send the money on its own**: it asks the owner for approval.
+> - At the end of the day it withdraws to the owner only what is no longer committed to future slots.
+> - Every decision is logged with the rule applied and its transaction, in a public log with no personal data.
+>
+> **The booking belongs to whoever paid.** From "My bookings" the person signs a one-time message (no gas) and sees and cancels the bookings paid from their wallet, on any device; the deposit goes back to the same wallet. The agent also sends a **non-transferable NFT** (ERC-721 + ERC-5192) with the slot details: it is burned on cancellation and changes to "played" when the slot is played. An AI agent that paid over x402 can look up its bookings the same way.
+>
+> **For the venue.** A dashboard with the day, a calendar per court, bookings, pending refunds, blocks (holidays, maintenance), the decision log and settings (price, deposit, hours, policy and limits), all with a change history. Changes apply to new bookings: each booking keeps the deposit and policy it was paid with.
+>
+> **Celo stack.** wARS (Ripio), x402 with the Celo facilitator (Permit2), ERC-8021 (every agent transaction carries the tag), ERC-8004 (agent identity), optional fee abstraction and our own non-transferable ERC-721.
+>
+> **How to try it.** The demo has a "Pay as a test" button to go through everything with no wallet and no money, plus a dashboard and a public decision log. Other agents can book and pay through the API (`GET /api/turnos` → `POST /api/reservas` → x402 payment).
+>
+> **Language.** The interface, the agent's messages and the Telegram replies are in English; the Telegram bot understands English and Spanish.
+
+**How the jury tries it in 2 minutes:**
+1. Open `<demo URL>` on a phone.
+2. Pick a day and a slot, type your name and tap **"Book and pay the deposit"**.
+3. On the payment page tap **"Pay as a test"** (no wallet or money needed in TEST MODE). If you connect your wallet first, the NFT ticket goes to it.
+4. See the confirmation and the **ticket**. Go back to "My bookings", tap "Cancel" and check how much you get back.
+5. Open `<URL>/decisiones`: everything the agent decided is there.
+6. Venue dashboard: `<URL>/panel`, password `<demo password>`.
+7. Another agent can book through the API: `GET <URL>/api/turnos`.
 
 ### Tecnologías
 Node 22 · Express 5 · SQLite · x402 v2 (Celo facilitator, Permit2) · wARS (Ripio) · viem · ERC-8021 · ERC-8004 · ERC-721/ERC-5192 (Solidity) · grammY (Telegram) · HTML/CSS/JS plano.
@@ -79,7 +118,7 @@ Node 22 · Express 5 · SQLite · x402 v2 (Celo facilitator, Permit2) · wARS (R
 |---|---|---|---|
 | **1. Funciona en mainnet con un wFIAT real** | Cobros y devoluciones reales en wARS sobre Celo, verificados por el tag | Hashes de pago, devolución y retiro; `npm run verify-tag` de cada uno; `loops project get` con `celo.agentWallet`; ERC-8004 registrado | ⬜ **depende de tu salida a mainnet** |
 | **2. Uso real de wFIAT y del stack de Celo** | wARS como moneda de cobro/devolución/retiro + x402 + ERC-8021 + ERC-8004 + fee abstraction + NFT propio | README (sección "Stack de Celo"), el contrato `SenaTicket.sol`, la identidad en 8004scan | 🟡 código listo; falta la prueba en mainnet |
-| **3. Autonomía y utilidad del agente** | Decisiones sin intervención del dueño, con topes y aprobación; a quién le ahorra tiempo | `/decisiones` (con reglas y transacciones), el panel "Pendientes", la tabla de reglas del README, números de uso real | 🟡 listo; falta el dueño real y su frase |
+| **3. Autonomía y utilidad del agente** | Decisiones sin intervención del dueño, con topes y aprobación; a quién le ahorra tiempo | `/decisiones` (con reglas y transacciones), el panel "Pending", la tabla de reglas del README, números de uso real | 🟡 listo; falta el dueño real y su frase |
 | **4. UX que una persona usa** | Alguien nuevo en cripto completa el flujo; importes en pesos; la cadena fuera de la vista | Video; capturas en `docs/capturas/` (celular); `npm run e2e`; prueba con 3 personas que no conocen cripto | 🟡 diseñado y probado en navegador; falta la prueba con billetera real y gente |
 | **5. Impacto para LatAm** | Para quién es, cuánto le ahorra y cómo crece más allá del hackathon | Comercio real con nombre, # de reservas y compradores (incluidos desconocidos), plan de crecimiento | ⬜ **depende del uso real** |
 
@@ -99,7 +138,7 @@ Ejecutá estos comandos y pegá el resultado.
 | Registro ERC-8004 | `npm run register -- --send` | agentId `…` · tx `0x…` |
 | Pago real #1 (x402, wARS) | pagar desde otra billetera | tx `0x…` |
 | Devolución #1 (con tag) | cancelar con >24 h | tx `0x…` · `npm run verify-tag -- 0x…` |
-| Retiro diario | `/cierre` en Telegram o el panel "Cierre del día" | tx `0x…` |
+| Retiro diario | `/cierre` en Telegram o el panel "Daily close" | tx `0x…` |
 | Tickets NFT | `npm run nft:probar -- --to 0xTuBilletera --quemar` | links del explorador |
 | Tests | `npm test` | **139 pruebas pasando** |
 | Prueba en navegador real | `npm run e2e` | ✅ |
@@ -118,7 +157,7 @@ Grabá en el **celular** (es donde se usa) con la demo en MODO PRUEBA, y mostrá
 | 0:00–0:15 | El comercio / el dueño | "Este es `<comercio>`. Pierden plata cuando alguien reserva y no viene. Seña cobra una seña en pesos digitales y se encarga solo." |
 | 0:15–0:50 | Web: elegir día y turno → nombre → pagar. Mostrar el **monto en pesos**, la cuenta regresiva y "Pagá con tu billetera" | "Se reserva en tres toques. La seña es de $ 6.000: la persona paga en wARS, el peso argentino digital, sin comisión de red." |
 | 0:50–1:10 | Confirmación + el ticket NFT | "Al pagar, la reserva queda en su billetera como un ticket intransferible." |
-| 1:10–1:40 | "Mis reservas con mi billetera" (firma) → Cancelar con vista previa | "Desde cualquier celular firma un mensaje sin gas y ve sus reservas. Antes de cancelar, el agente le dice cuánto le devuelve y por qué." |
+| 1:10–1:40 | "See my bookings with my wallet" (firma) → Cancelar con vista previa | "Desde cualquier celular firma un mensaje sin gas y ve sus reservas. Antes de cancelar, el agente le dice cuánto le devuelve y por qué." |
 | 1:40–2:20 | **`/decisiones`**: una cancelación tardía, la reventa y la devolución | "Cada decisión queda registrada con la regla y su transacción. Acá canceló 3 horas antes: la seña queda, y cuando el turno se revendió, el agente se la devolvió solo." |
 | 2:20–2:40 | Panel: Hoy, Pendientes (una devolución grande esperando) | "Las devoluciones grandes no las manda solo: le pide aprobación al dueño." |
 | 2:40–3:00 | Celoscan: un pago y una devolución con el tag; 8004scan | "Todo esto está en Celo mainnet. Acá están las transacciones reales y la identidad del agente." |
@@ -130,11 +169,11 @@ Consejos: texto grande en pantalla, sin música fuerte, sin mostrar claves ni el
 ## 6. Cómo prueba el jurado en 2 minutos (ponelo en el formulario)
 
 1. Abrí `<URL de la demo>` en el celular.
-2. Elegí un día y un turno, escribí tu nombre y tocá "Reservar y pagar la seña".
-3. En la página de pago, tocá **"Pagar de prueba"** (no hace falta billetera ni plata en MODO PRUEBA). Si conectás tu billetera antes, el ticket NFT llega a ella.
-4. Mirá la confirmación y el **ticket**. Volvé a "Mis reservas", tocá "Cancelar" y fijate cuánto te devuelve.
+2. Elegí un día y un turno, escribí tu nombre y tocá **"Book and pay the deposit"**.
+3. En la página de pago, tocá **"Pay as a test"** (no hace falta billetera ni plata en MODO PRUEBA). Si conectás tu billetera antes, el ticket NFT llega a ella.
+4. Mirá la confirmación y el **ticket**. Volvé a "My bookings", tocá "Cancel" y fijate cuánto te devuelve.
 5. Abrí `<URL>/decisiones`: ahí está todo lo que decidió el agente.
-6. Panel del comercio: `<URL>/panel`, clave `<clave de la demo>`.
+6. Panel del comercio (venue dashboard): `<URL>/panel`, clave `<clave de la demo>`.
 7. Otro agente puede reservar por API: `GET <URL>/api/turnos`.
 
 ---
@@ -159,7 +198,7 @@ Los jueces prueban la app. Cada cosa que afirmes tiene que poder verificarse.
 - Que cumple con la regulación argentina: es una consulta pendiente.
 - Que funciona con billeteras de contrato: el "ver mis reservas" soporta billeteras comunes.
 
-**Límites declarados (ya están en el README):** comercio de demostración; calendario propio; "Mis reservas" del navegador se pierde si se borra (la billetera lo resuelve para reservas pagadas); la billetera del agente es caliente, con saldo chico y topes; el NFT por defecto está en testnet.
+**Límites declarados (ya están en el README):** comercio de demostración; calendario propio; "My bookings" del navegador se pierde si se borra (la billetera lo resuelve para reservas pagadas); la billetera del agente es caliente, con saldo chico y topes; el NFT por defecto está en testnet.
 
 ---
 
@@ -203,7 +242,7 @@ loops project create --event agents-on-open-rails \
 **Código**
 - [ ] `git push` hecho; el repo es **público**; `.env` no está subido; sin claves en el historial.
 - [ ] `npm test` → 139 pruebas pasando · `npm run build:web` ok · `npm run e2e` ok.
-- [ ] `README.md` y `GUIA.md` dicen lo mismo que la app (y los números de pruebas coinciden).
+- [ ] `README.md` y `docs/GUIA.md` dicen lo mismo que la app (y los números de pruebas coinciden).
 
 **En línea**
 - [ ] La demo carga desde el celular **con datos móviles** (no solo tu wifi) y desde una ventana de incógnito.

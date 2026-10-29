@@ -1,4 +1,4 @@
-// Reserva web para clientes. El cliente se identifica con un token guardado en este navegador
+// Web booking for customers. El cliente se identifica con un token guardado en este navegador
 // (el mismo clienteToken que usa la API): sirve para ver y cancelar sus reservas, y viaja siempre en el cuerpo.
 // Todo lo que viene del servidor entra como texto (nunca como HTML).
 import {
@@ -19,7 +19,7 @@ const S = {
 };
 const BILL_KEY = 'sena_billetera';
 const token = () => { const t = storage.get(TOKEN_KEY); return t && TOKEN_RE.test(t) ? t : null; };
-const errorDeRed = (err) => (err.status ? err.message : 'No pudimos conectarnos. Revisá tu conexión y probá de nuevo.');
+const errorDeRed = (err) => (err.status ? err.message : 'We could not connect. Check your connection and try again.');
 
 // --- Arranque ------------------------------------------------------------------------------------------
 
@@ -28,13 +28,13 @@ async function init() {
   setChildren($('#turnos'), esqueletos());
   S.negocio = await request('GET', '/api/negocio');
   const n = S.negocio;
-  document.title = `Reservá tu turno · ${n.nombre}`;
+  document.title = `Book your slot · ${n.nombre}`;
   setChildren($('#carteles'), carteles(n));
   // En el comercio de demostración el cartel de arriba ya lo explica: no se repite la descripción.
   $('#negocio').textContent = n.descripcion && !n.esDemostracion ? `${n.nombre} · ${n.descripcion}` : n.nombre;
-  $('#f-sena').replaceChildren(h('span', { class: 'num' }, n.sena), ' ', h('span', { class: 'monto-token' }, 'en wARS'));
-  $('#f-tiempo').textContent = `${n.reservaSinPagarMinutos} minutos`;
-  $('#como-token').textContent = `en wARS, el peso argentino digital · seña de ${n.sena.replace('$ ', '$\u00a0')}`;
+  $('#f-sena').replaceChildren(h('span', { class: 'num' }, n.sena), ' ', h('span', { class: 'monto-token' }, 'in wARS'));
+  $('#f-tiempo').textContent = `${n.reservaSinPagarMinutos} minutes`;
+  $('#como-token').textContent = `in wARS, the digital Argentine peso · deposit of ${n.sena.replace('$ ', '$\u00a0')}`;
   setChildren($('#politica'), n.politica.map((p) => h('li', {}, p)));
   $('#f-nombre').value = storage.get(NAME_KEY) ?? '';
   $('#f-contacto').value = storage.get(CONTACT_KEY) ?? '';
@@ -56,8 +56,8 @@ function setPaso(n) {
 
 // --- Días y turnos ----------------------------------------------------------------------------------------
 
-const avisoErrorTurnos = (err, reintentar) => aviso('error', h('strong', {}, 'No pudimos cargar los turnos'), errorDeRed(err),
-  h('div', { class: 'acciones' }, h('button', { class: 'btn btn-secundario', type: 'button', onclick: reintentar }, 'Probar de nuevo')));
+const avisoErrorTurnos = (err, reintentar) => aviso('error', h('strong', {}, 'We could not load the slots'), errorDeRed(err),
+  h('div', { class: 'acciones' }, h('button', { class: 'btn btn-secundario', type: 'button', onclick: reintentar }, 'Try again')));
 
 async function cargarDias() {
   try {
@@ -65,7 +65,7 @@ async function cargarDias() {
     S.dias = first.diasDisponibles ?? [];
     if (S.dias.length === 0) {
       setChildren($('#dias'));
-      setChildren($('#turnos'), vacio({ titulo: 'Por ahora no hay turnos para reservar', texto: 'El comercio todavía no abrió turnos para los próximos días. Probá de nuevo más tarde.' }));
+      setChildren($('#turnos'), vacio({ titulo: 'No slots to book right now', texto: 'The venue has not opened slots for the coming days yet. Please try again later.' }));
       $('#turnos').setAttribute('aria-busy', 'false');
       return;
     }
@@ -113,7 +113,7 @@ function renderTurnos() {
   const hayTurnos = S.turnos.length > 0;
   $('#leyenda').hidden = !hayTurnos;
   if (!hayTurnos) {
-    setChildren($('#turnos'), vacio({ titulo: 'Ese día no hay turnos', texto: 'Probá con otro día de la lista de arriba.' }));
+    setChildren($('#turnos'), vacio({ titulo: 'No slots that day', texto: 'Try another day from the list above.' }));
     return;
   }
   const libres = S.turnos.filter((t) => t.estado === 'libre').length;
@@ -122,18 +122,18 @@ function renderTurnos() {
   const botonTurno = (t) => {
     const nombre = `${t.recurso}, ${t.hora}`;
     if (t.estado === 'bloqueado') {
-      return h('button', { class: 'turno turno--bloqueado', type: 'button', disabled: true, 'aria-label': `${nombre}: no disponible${t.motivo ? ` (${t.motivo})` : ''}` }, t.recurso, t.motivo ? h('small', {}, t.motivo) : null);
+      return h('button', { class: 'turno turno--bloqueado', type: 'button', disabled: true, 'aria-label': `${nombre}: unavailable${t.motivo ? ` (${t.motivo})` : ''}` }, t.recurso, t.motivo ? h('small', {}, t.motivo) : null);
     }
     const ocupado = t.estado === 'ocupado';
     const elegido = S.seleccion && S.seleccion.recurso === t.recurso && S.seleccion.inicio === t.inicio;
     return h('button', {
       class: `turno${ocupado ? ' turno--ocupado' : ''}`, type: 'button', 'aria-pressed': String(Boolean(elegido)),
-      'aria-label': `${nombre}: ${ocupado ? 'ocupado, anotarse en la lista de espera' : 'libre'}`,
+      'aria-label': `${nombre}: ${ocupado ? 'taken, join the waitlist' : 'free'}`,
       onclick: () => elegirTurno(t),
-    }, t.recurso, ocupado ? h('small', {}, 'Lista de espera') : null);
+    }, t.recurso, ocupado ? h('small', {}, 'Waitlist') : null);
   };
   setChildren($('#turnos'),
-    h('p', { class: 'apagado', role: 'status' }, libres === 0 ? 'No quedan turnos libres este día: podés anotarte en la lista de espera.' : `${libres} ${libres === 1 ? 'turno libre' : 'turnos libres'} el ${fmtFecha(S.dia)}.`),
+    h('p', { class: 'apagado', role: 'status' }, libres === 0 ? 'No free slots this day: you can join the waitlist.' : `${libres} free ${libres === 1 ? 'slot' : 'slots'} on ${fmtFecha(S.dia)}.`),
     h('div', { class: 'tarjeta' }, [...porHora].map(([hora, items]) => h('div', { class: 'franja' }, h('div', { class: 'franja-hora num' }, hora), h('div', { class: 'franja-canchas' }, items.map(botonTurno))))));
 }
 
@@ -154,12 +154,12 @@ function renderFormulario(enfocar = false) {
   if (!sel) return;
   const n = S.negocio;
   $('#f-turno').textContent = `${sel.recurso} · ${fmtFecha(S.dia)} · ${sel.hora}`;
-  $('#t-form').textContent = sel.ocupado ? 'Anotate en la lista de espera' : 'Tus datos';
-  $('#f-tiempo-t').textContent = sel.ocupado ? 'Si se libera' : 'Tiempo para pagar';
-  $('#f-tiempo').textContent = sel.ocupado ? `Te lo guardamos ${n.listaEsperaMinutos} minutos` : `${n.reservaSinPagarMinutos} minutos`;
-  $('#f-ok').textContent = sel.ocupado ? 'Anotarme en la lista de espera' : 'Reservar y pagar la seña';
+  $('#t-form').textContent = sel.ocupado ? 'Join the waitlist' : 'Your details';
+  $('#f-tiempo-t').textContent = sel.ocupado ? 'If it frees up' : 'Time to pay';
+  $('#f-tiempo').textContent = sel.ocupado ? `We hold it for ${n.listaEsperaMinutos} minutes` : `${n.reservaSinPagarMinutos} minutes`;
+  $('#f-ok').textContent = sel.ocupado ? 'Join the waitlist' : 'Book and pay the deposit';
   if (sel.ocupado) {
-    setChildren($('#f-error'), aviso('info', 'Este turno está ocupado. Si alguien cancela, te lo guardamos y lo ves en "Mis reservas" con el link para pagar la seña.'));
+    setChildren($('#f-error'), aviso('info', 'This slot is taken. If someone cancels, we hold it for you and you will see it in "My bookings" with the link to pay the deposit.'));
   }
   if (enfocar) { $('#formulario').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); $('#t-form').focus({ preventScroll: true }); }
 }
@@ -172,7 +172,7 @@ async function enviar(e) {
   setChildren($('#f-nombre-error'));
   if (!nombre) {
     $('#f-nombre').setAttribute('aria-invalid', 'true');
-    setChildren($('#f-nombre-error'), h('div', { class: 'error-campo', role: 'alert' }, 'Escribí tu nombre para poder reservar.'));
+    setChildren($('#f-nombre-error'), h('div', { class: 'error-campo', role: 'alert' }, 'Enter your name to book.'));
     $('#f-nombre').focus();
     return;
   }
@@ -187,7 +187,7 @@ async function enviar(e) {
       const r = await request('POST', '/api/lista-espera', { recurso: sel.recurso, inicio: sel.inicio, cliente });
       storage.set(TOKEN_KEY, r.clienteToken);
       S.seleccion = null; renderFormulario();
-      setChildren($('#aviso'), aviso('ok', h('strong', {}, r.puesto === 1 ? 'Listo, quedaste primero en la lista de espera.' : `Listo, quedaste en el puesto ${r.puesto} de la lista de espera.`), 'Si se libera, te guardamos el turno y lo ves abajo, en "Mis reservas", con el link para pagar.'));
+      setChildren($('#aviso'), aviso('ok', h('strong', {}, r.puesto === 1 ? 'Done, you are first on the waitlist.' : `Done, you are number ${r.puesto} on the waitlist.`), 'If it frees up, we hold the slot for you and you will see it below, in "My bookings", with the link to pay.'));
       await Promise.all([refrescarTurnos(), cargarMias()]);
       return;
     }
@@ -195,8 +195,8 @@ async function enviar(e) {
     storage.set(TOKEN_KEY, r.clienteToken);
     location.assign(`/pagar/${r.reserva.id}`); // el pago sigue en la página de siempre
   } catch (err) {
-    setChildren($('#f-error'), aviso('error', h('strong', {}, err.status === 409 ? 'Ese turno se acaba de ocupar' : 'No se pudo reservar'), errorDeRed(err),
-      err.status === 409 ? h('div', { class: 'acciones' }, h('button', { class: 'btn btn-secundario', type: 'button', onclick: () => { S.seleccion = null; renderFormulario(); refrescarTurnos(); } }, 'Ver otros turnos')) : null));
+    setChildren($('#f-error'), aviso('error', h('strong', {}, err.status === 409 ? 'That slot was just taken' : 'Could not book'), errorDeRed(err),
+      err.status === 409 ? h('div', { class: 'acciones' }, h('button', { class: 'btn btn-secundario', type: 'button', onclick: () => { S.seleccion = null; renderFormulario(); refrescarTurnos(); } }, 'See other slots')) : null));
     if (err.status === 409) refrescarTurnos();
   } finally {
     S.enviando = false;
@@ -229,32 +229,32 @@ function renderMias() {
   const anteriores = reservas.filter((b) => !vigentes.includes(b));
   const nodes = [S.mensaje];
   if (reservas.length === 0 && esperas.length === 0) {
-    nodes.push(vacio({ titulo: 'Todavía no tenés reservas', texto: 'Cuando reserves un turno lo vas a ver acá, con su estado. Se guardan en este navegador: si abrís la página desde otro celular, no van a aparecer.' }));
+    nodes.push(vacio({ titulo: 'You have no bookings yet', texto: 'When you book a slot you will see it here, with its status. They are saved in this browser: if you open the page on another phone, they will not show up.' }));
   }
-  if (vigentes.length) nodes.push(h('div', { class: 'pila' }, h('h3', {}, 'Próximas'), vigentes.map(tarjeta)));
+  if (vigentes.length) nodes.push(h('div', { class: 'pila' }, h('h3', {}, 'Upcoming'), vigentes.map(tarjeta)));
   if (esperas.length) {
-    nodes.push(h('div', { class: 'pila' }, h('h3', {}, 'En lista de espera'), esperas.map((w) => h('div', { class: 'tarjeta pila--chica' },
+    nodes.push(h('div', { class: 'pila' }, h('h3', {}, 'On the waitlist'), esperas.map((w) => h('div', { class: 'tarjeta pila--chica' },
       h('div', { class: 'fila fila--separada' }, h('strong', {}, `${w.recurso} · ${w.inicioLocal}`),
-        w.estado === 'offered' ? h('span', { class: 'estado es-esperando' }, 'Te lo ofrecimos') : h('span', { class: 'estado es-vencida' }, `Puesto ${w.puesto}`)),
-      h('p', { class: 'apagado' }, w.estado === 'offered' ? 'Mirá "Próximas": ahí está el turno con el link para pagar.' : 'Si se libera, lo ves acá.')))));
+        w.estado === 'offered' ? h('span', { class: 'estado es-esperando' }, 'We offered it to you') : h('span', { class: 'estado es-vencida' }, `Position ${w.puesto}`)),
+      h('p', { class: 'apagado' }, w.estado === 'offered' ? 'Look under "Upcoming": the slot is there with the link to pay.' : 'If it frees up, you will see it here.')))));
   }
-  if (anteriores.length) nodes.push(h('div', { class: 'pila' }, h('h3', {}, 'Anteriores'), anteriores.map(tarjeta)));
+  if (anteriores.length) nodes.push(h('div', { class: 'pila' }, h('h3', {}, 'Past'), anteriores.map(tarjeta)));
   setChildren($('#mis'), h('div', { class: 'pila--grande' }, nodes));
 }
 
 /** El ticket NFT de una reserva: qué pasó con él y, si ya está en la cadena, dónde verlo. */
 function textoNft(n) {
-  if (n.estado === 'enviando') return 'Enviándose a tu billetera…';
-  if (n.estado === 'error') return 'Reintentando';
-  const texto = n.estado === 'jugado' ? 'Jugado' : 'En tu billetera';
-  return n.simulado ? `${texto} (simulado)` : h('a', { href: safeHref(n.urlToken), target: '_blank', rel: 'noopener noreferrer' }, texto);
+  if (n.estado === 'enviando') return 'Being sent to your wallet…';
+  if (n.estado === 'error') return 'Retrying';
+  const texto = n.estado === 'jugado' ? 'Played' : 'In your wallet';
+  return n.simulado ? `${texto} (simulated)` : h('a', { href: safeHref(n.urlToken), target: '_blank', rel: 'noopener noreferrer' }, texto);
 }
 
 /** Lo primero que se lee antes de cancelar: cuánto devuelve la política. */
 function titularCancelacion(c) {
-  if (c.regla === 'SIN_PAGO') return 'Todavía no pagaste: se cancela sin costo.';
-  if (c.devolucion === '$ 0') return 'Si cancelás ahora, la seña no se devuelve.';
-  return `Si cancelás ahora, te devolvemos ${c.devolucion}.`;
+  if (c.regla === 'SIN_PAGO') return 'You have not paid yet: it is cancelled at no cost.';
+  if (c.devolucion === '$ 0') return 'If you cancel now, the deposit is not refunded.';
+  return `If you cancel now, we refund ${c.devolucion}.`;
 }
 
 function tarjeta(b) {
@@ -263,25 +263,25 @@ function tarjeta(b) {
   const card = h('div', { class: 'tarjeta pila' },
     h('div', { class: 'fila fila--separada' }, h('strong', {}, `${b.recurso} · ${b.inicioLocal}`), estadoEtiqueta(b.estado)),
     h('dl', { class: 'resumen' },
-      h('div', {}, h('dt', {}, 'Seña'), h('dd', { class: 'num' }, b.sena.texto, ' ', h('span', { class: 'monto-token' }, 'en wARS'))),
-      b.devuelto.pesos !== '0' ? h('div', {}, h('dt', {}, 'Te devolvimos'), h('dd', { class: 'num' }, b.devuelto.texto)) : null,
-      b.estado === 'held' && b.venceEl ? h('div', {}, h('dt', {}, 'Tenés para pagar'), h('dd', {}, `${minutosRestantes(b.venceEl)} min`)) : null,
-      b.nft ? h('div', {}, h('dt', {}, 'Ticket NFT'), h('dd', {}, textoNft(b.nft))) : null),
-    b.estado === 'expired' ? aviso('info', 'No se pagó la seña a tiempo y el turno se liberó. Podés reservar de nuevo.') : null,
-    b.estado === 'confirmed' ? aviso('ok', 'Turno confirmado. Si necesitás cancelar, antes de confirmar te mostramos cuánto te devolvemos.') : null);
+      h('div', {}, h('dt', {}, 'Deposit'), h('dd', { class: 'num' }, b.sena.texto, ' ', h('span', { class: 'monto-token' }, 'in wARS'))),
+      b.devuelto.pesos !== '0' ? h('div', {}, h('dt', {}, 'Refunded to you'), h('dd', { class: 'num' }, b.devuelto.texto)) : null,
+      b.estado === 'held' && b.venceEl ? h('div', {}, h('dt', {}, 'Time left to pay'), h('dd', {}, `${minutosRestantes(b.venceEl)} min`)) : null,
+      b.nft ? h('div', {}, h('dt', {}, 'NFT ticket'), h('dd', {}, textoNft(b.nft))) : null),
+    b.estado === 'expired' ? aviso('info', 'The deposit was not paid in time and the slot was released. You can book again.') : null,
+    b.estado === 'confirmed' ? aviso('ok', 'Slot confirmed. If you need to cancel, we show you how much you get back before you confirm.') : null);
   const c = S.confirmando;
   if (c && c.id === b.id) {
     card.append(
       aviso(c.ok ? 'atencion' : 'error', c.ok ? [h('strong', {}, titularCancelacion(c)), c.motivo] : c.motivo),
       h('div', { class: 'acciones' },
-        c.ok ? h('button', { class: 'btn btn-peligro', type: 'button', onclick: () => cancelar(b.id), ...(c.enviando ? { 'aria-busy': 'true' } : {}) }, 'Sí, cancelar mi reserva') : null,
-        h('button', { class: 'btn btn-secundario', type: 'button', onclick: () => { S.confirmando = null; renderMias(); } }, 'Volver')));
+        c.ok ? h('button', { class: 'btn btn-peligro', type: 'button', onclick: () => cancelar(b.id), ...(c.enviando ? { 'aria-busy': 'true' } : {}) }, 'Yes, cancel my booking') : null,
+        h('button', { class: 'btn btn-secundario', type: 'button', onclick: () => { S.confirmando = null; renderMias(); } }, 'Back')));
     return card;
   }
   if (activa && valida) {
     card.append(h('div', { class: 'acciones' },
-      b.estado === 'held' ? h('a', { class: 'btn btn-primario', href: safeHref(`/pagar/${b.id}`) }, 'Pagar la seña') : h('a', { class: 'btn btn-secundario', href: safeHref(`/pagar/${b.id}`) }, 'Ver comprobante'),
-      h('button', { class: 'btn btn-peligro-suave', type: 'button', onclick: () => previsualizar(b.id) }, 'Cancelar')));
+      b.estado === 'held' ? h('a', { class: 'btn btn-primario', href: safeHref(`/pagar/${b.id}`) }, 'Pay the deposit') : h('a', { class: 'btn btn-secundario', href: safeHref(`/pagar/${b.id}`) }, 'View receipt'),
+      h('button', { class: 'btn btn-peligro-suave', type: 'button', onclick: () => previsualizar(b.id) }, 'Cancel')));
   }
   return card;
 }
@@ -309,9 +309,9 @@ async function cancelar(id) {
   renderMias();
   try {
     const r = await pedirCancelacion(id, 'cancelar');
-    S.mensaje = aviso('ok', h('strong', {}, 'Reserva cancelada.'), r.motivo, r.devolucion && r.devolucion !== '$ 0' ? ` Te devolvemos ${r.devolucion}: llega a la misma billetera con la que pagaste.` : '');
+    S.mensaje = aviso('ok', h('strong', {}, 'Booking cancelled.'), r.motivo, r.devolucion && r.devolucion !== '$ 0' ? ` We refund ${r.devolucion}: it goes back to the same wallet you paid with.` : '');
   } catch (err) {
-    S.mensaje = aviso('error', h('strong', {}, 'No se pudo cancelar'), errorDeRed(err));
+    S.mensaje = aviso('error', h('strong', {}, 'Could not cancel'), errorDeRed(err));
   } finally {
     S.confirmando = null;
     S.enviando = false;
@@ -326,7 +326,7 @@ const aHex = (texto) => `0x${[...new TextEncoder().encode(texto)].map((b) => b.t
 function sesionVencida(err) {
   if (err.data?.codigo === 'sin_sesion') {
     desconectarBilletera();
-    S.bill.mensaje = aviso('atencion', h('strong', {}, 'Pasó mucho tiempo'), 'Por seguridad, la conexión con tu billetera dura unos minutos. Volvé a conectarla para ver tus reservas.');
+    S.bill.mensaje = aviso('atencion', h('strong', {}, 'Too much time has passed'), 'For security, the connection to your wallet lasts a few minutes. Connect it again to see your bookings.');
     renderBilletera(); renderMias();
   }
   throw err;
@@ -367,9 +367,9 @@ async function restaurarBilletera() {
 }
 
 function mensajeDeFirma(err) {
-  if (err?.code === 4001 || /user rejected|user denied|rejected the request/i.test(err?.message ?? '')) return aviso('info', h('strong', {}, 'No firmaste'), 'No pasó nada ni se cobró nada. Podés intentar de nuevo cuando quieras.');
-  if (err?.code === -32002) return aviso('atencion', h('strong', {}, 'Tu billetera tiene un pedido abierto'), 'Abrila y respondé ese pedido primero.');
-  return aviso('error', h('strong', {}, 'No pudimos verificar tu billetera'), err.status ? err.message : (err?.message ?? 'Probá de nuevo.'));
+  if (err?.code === 4001 || /user rejected|user denied|rejected the request/i.test(err?.message ?? '')) return aviso('info', h('strong', {}, 'You did not sign'), 'Nothing happened and nothing was charged. You can try again whenever you like.');
+  if (err?.code === -32002) return aviso('atencion', h('strong', {}, 'Your wallet has an open request'), 'Open it and answer that request first.');
+  return aviso('error', h('strong', {}, 'We could not verify your wallet'), err.status ? err.message : (err?.message ?? 'Please try again.'));
 }
 
 async function conectarBilletera() {
@@ -393,28 +393,28 @@ function renderBilletera() {
   if (b.sesion) {
     setChildren($('#billetera'), h('div', { class: 'tarjeta tarjeta--suave pila--chica' },
       h('div', { class: 'fila fila--separada' },
-        h('div', { class: 'fila' }, icono('wallet'), h('strong', {}, 'Billetera conectada'), h('span', { class: 'mono apagado' }, abreviar(b.direccion))),
-        h('button', { class: 'btn btn-fantasma btn-chico', type: 'button', onclick: () => { desconectarBilletera(); renderBilletera(); renderMias(); } }, 'Desconectar')),
+        h('div', { class: 'fila' }, icono('wallet'), h('strong', {}, 'Wallet connected'), h('span', { class: 'mono apagado' }, abreviar(b.direccion))),
+        h('button', { class: 'btn btn-fantasma btn-chico', type: 'button', onclick: () => { desconectarBilletera(); renderBilletera(); renderMias(); } }, 'Disconnect')),
       h('p', { class: 'apagado', role: 'status' }, b.reservas.length === 0
-        ? 'No encontramos reservas pagadas con esta billetera.'
-        : `Encontramos ${b.reservas.length} ${b.reservas.length === 1 ? 'reserva pagada' : 'reservas pagadas'} con esta billetera. Las ves abajo, en cualquier dispositivo.`)));
+        ? 'We found no bookings paid with this wallet.'
+        : `We found ${b.reservas.length} paid ${b.reservas.length === 1 ? 'booking' : 'bookings'} with this wallet. You can see them below, on any device.`)));
     return;
   }
   if (!window.ethereum) {
     setChildren($('#billetera'), h('div', { class: 'tarjeta tarjeta--suave pila--chica' },
-      h('div', { class: 'fila' }, icono('wallet'), h('strong', {}, '¿Pagaste con tu billetera?')),
-      h('p', { class: 'apagado' }, 'Abrí esta página desde el navegador de tu billetera (MetaMask, MiniPay…) y vas a ver tus reservas desde cualquier celular o computadora.')));
+      h('div', { class: 'fila' }, icono('wallet'), h('strong', {}, 'Did you pay with your wallet?')),
+      h('p', { class: 'apagado' }, 'Open this page from your wallet\'s browser (MetaMask, MiniPay…) and you will see your bookings from any phone or computer.')));
     return;
   }
   setChildren($('#billetera'), h('div', { class: 'tarjeta pila--chica' },
-    h('div', { class: 'fila' }, icono('wallet'), h('h3', {}, 'Ver mis reservas con mi billetera')),
-    h('p', { class: 'apagado' }, 'Firmás un mensaje (no cuesta nada ni mueve plata) y te mostramos todas las reservas que pagaste con esa billetera, desde cualquier dispositivo.'),
+    h('div', { class: 'fila' }, icono('wallet'), h('h3', {}, 'See my bookings with my wallet')),
+    h('p', { class: 'apagado' }, 'You sign a message (it costs nothing and moves no money) and we show you every booking you paid with that wallet, from any device.'),
     b.mensaje,
-    h('button', { class: 'btn btn-secundario btn-bloque', type: 'button', id: 'conectar-billetera', onclick: conectarBilletera, ...(b.conectando ? { 'aria-busy': 'true' } : {}) }, b.conectando ? 'Esperando tu firma…' : 'Conectar billetera')));
+    h('button', { class: 'btn btn-secundario btn-bloque', type: 'button', id: 'conectar-billetera', onclick: conectarBilletera, ...(b.conectando ? { 'aria-busy': 'true' } : {}) }, b.conectando ? 'Waiting for your signature…' : 'Connect wallet')));
 }
 
 init().catch((err) => {
-  setChildren($('#turnos'), aviso('error', h('strong', {}, 'No pudimos cargar la página'), errorDeRed(err),
-    h('div', { class: 'acciones' }, h('button', { class: 'btn btn-secundario', type: 'button', onclick: () => location.reload() }, 'Recargar'))));
+  setChildren($('#turnos'), aviso('error', h('strong', {}, 'We could not load the page'), errorDeRed(err),
+    h('div', { class: 'acciones' }, h('button', { class: 'btn btn-secundario', type: 'button', onclick: () => location.reload() }, 'Reload'))));
   $('#turnos').setAttribute('aria-busy', 'false');
 });

@@ -1,4 +1,4 @@
-// Motor de reglas de plata. Es código fijo y determinista: el modelo de lenguaje
+// Motor de reglas de plata (rule texts are in English). Es código fijo y determinista: el modelo de lenguaje
 // nunca decide cuánto se devuelve ni cuánto se transfiere. Cada función devuelve
 // también una regla con nombre y un motivo en castellano, que van al registro de decisiones.
 import { arsToWei, percentOf, formatArs, minBig } from './money.js';
@@ -23,7 +23,7 @@ export function decideCancellation({ startAt, now, paidWei, policy }) {
     return {
       refundWei: 0n,
       rule: 'TURNO_EMPEZADO',
-      reason: `El turno ya empezó (hace ${(-hoursBefore).toFixed(1)} h). No se puede cancelar ni devolver.`,
+      reason: `The slot already started (${(-hoursBefore).toFixed(1)} h ago). It cannot be cancelled or refunded.`,
       hoursBefore,
       offerToWaitlist: false,
     };
@@ -32,7 +32,7 @@ export function decideCancellation({ startAt, now, paidWei, policy }) {
     return {
       refundWei: paid,
       rule: 'A_TIEMPO',
-      reason: `Canceló ${h} h antes (mínimo ${policy.devolucionTotalHorasAntes} h). Se devuelve toda la seña: ${formatArs(paid)}.`,
+      reason: `Cancelled ${h} h ahead (minimum ${policy.devolucionTotalHorasAntes} h). The whole deposit is refunded: ${formatArs(paid)}.`,
       hoursBefore,
       offerToWaitlist: true,
     };
@@ -42,8 +42,8 @@ export function decideCancellation({ startAt, now, paidWei, policy }) {
     return {
       refundWei: refund,
       rule: 'TARDE_PARCIAL',
-      reason: `Canceló ${h} h antes, entre ${policy.devolucionParcialHorasAntes} y ${policy.devolucionTotalHorasAntes} h. Se devuelve el ${policy.devolucionParcialPorcentaje}%: ${formatArs(refund)}.` +
-        (policy.devolverSiSeRevende ? ' Si el turno se vuelve a vender, se devuelve el resto.' : ''),
+      reason: `Cancelled ${h} h ahead, between ${policy.devolucionParcialHorasAntes} and ${policy.devolucionTotalHorasAntes} h. ${policy.devolucionParcialPorcentaje}% is refunded: ${formatArs(refund)}.` +
+        (policy.devolverSiSeRevende ? ' If the slot is resold, the rest is refunded.' : ''),
       hoursBefore,
       offerToWaitlist: true,
     };
@@ -51,8 +51,8 @@ export function decideCancellation({ startAt, now, paidWei, policy }) {
   return {
     refundWei: 0n,
     rule: 'MUY_TARDE',
-    reason: `Canceló ${h} h antes (menos de ${policy.devolucionParcialHorasAntes} h). La seña queda para el negocio.` +
-      (policy.devolverSiSeRevende ? ' Si el turno se vuelve a vender, se devuelve.' : ''),
+    reason: `Cancelled ${h} h ahead (less than ${policy.devolucionParcialHorasAntes} h). The deposit stays with the venue.` +
+      (policy.devolverSiSeRevende ? ' If the slot is resold, it is refunded.' : ''),
     hoursBefore,
     offerToWaitlist: true,
   };
@@ -65,12 +65,12 @@ export function decideCancellation({ startAt, now, paidWei, policy }) {
 export function decideResaleRefund({ paidWei, alreadyRefundedWei, policy }) {
   const remaining = BigInt(paidWei) - BigInt(alreadyRefundedWei);
   if (!policy.devolverSiSeRevende || remaining <= 0n) {
-    return { refundWei: 0n, rule: 'REVENTA_SIN_DEVOLUCION', reason: 'No queda nada retenido para devolver.' };
+    return { refundWei: 0n, rule: 'REVENTA_SIN_DEVOLUCION', reason: 'Nothing is left to refund.' };
   }
   return {
     refundWei: remaining,
     rule: 'REVENTA',
-    reason: `El turno se volvió a vender, así que se devuelve lo que se había retenido: ${formatArs(remaining)}.`,
+    reason: `The slot was resold, so what had been kept is refunded: ${formatArs(remaining)}.`,
   };
 }
 
@@ -81,21 +81,21 @@ export function decideResaleRefund({ paidWei, alreadyRefundedWei, policy }) {
 export function checkTransferLimits({ amountWei, kind, sentTodayWei, limits }) {
   const amount = BigInt(amountWei);
   const hardMax = arsToWei(limits.transferenciaMaxArs);
-  if (amount <= 0n) return { ok: false, needsOwner: false, reason: 'El monto tiene que ser mayor a cero.' };
+  if (amount <= 0n) return { ok: false, needsOwner: false, reason: 'The amount must be greater than zero.' };
   if (amount > hardMax) {
-    return { ok: false, needsOwner: true, reason: `Supera el máximo por transferencia (${formatArs(hardMax)}).` };
+    return { ok: false, needsOwner: true, reason: `It exceeds the maximum per transfer (${formatArs(hardMax)}).` };
   }
   if (kind === 'refund') {
     const autoMax = arsToWei(limits.devolucionMaxAutomaticaArs);
     const dailyMax = arsToWei(limits.devolucionesMaxDiariasArs);
     if (amount > autoMax) {
-      return { ok: false, needsOwner: true, reason: `La devolución supera el tope automático (${formatArs(autoMax)}).` };
+      return { ok: false, needsOwner: true, reason: `The refund exceeds the automatic limit (${formatArs(autoMax)}).` };
     }
     if (BigInt(sentTodayWei) + amount > dailyMax) {
-      return { ok: false, needsOwner: true, reason: `Se pasaría del tope diario de devoluciones (${formatArs(dailyMax)}).` };
+      return { ok: false, needsOwner: true, reason: `It would go over the daily refund limit (${formatArs(dailyMax)}).` };
     }
   }
-  return { ok: true, needsOwner: false, reason: 'Dentro de los topes.' };
+  return { ok: true, needsOwner: false, reason: 'Within the limits.' };
 }
 
 /**
@@ -109,14 +109,14 @@ export function decidePayout({ balanceWei, liabilitiesWei, reserveWei, maxTransf
     return {
       amountWei: 0n,
       rule: 'SIN_RETIRO',
-      reason: `Saldo ${formatArs(balanceWei)}, comprometido en señas de turnos futuros ${formatArs(liabilitiesWei)}, reserva ${formatArs(reserveWei)}. No queda nada libre para retirar.`,
+      reason: `Balance ${formatArs(balanceWei)}, committed in deposits for future slots ${formatArs(liabilitiesWei)}, reserve ${formatArs(reserveWei)}. Nothing is free to withdraw.`,
     };
   }
   const amount = minBig(available, BigInt(maxTransferWei));
   return {
     amountWei: amount,
     rule: amount < available ? 'RETIRO_CON_TOPE' : 'RETIRO',
-    reason: `Saldo ${formatArs(balanceWei)} menos señas de turnos futuros ${formatArs(liabilitiesWei)} y reserva ${formatArs(reserveWei)}: se pueden retirar ${formatArs(available)}.` +
-      (amount < available ? ` Se transfiere ${formatArs(amount)} por el tope por transferencia.` : ''),
+    reason: `Balance ${formatArs(balanceWei)} minus deposits for future slots ${formatArs(liabilitiesWei)} and reserve ${formatArs(reserveWei)}: ${formatArs(available)} can be withdrawn.` +
+      (amount < available ? ` ${formatArs(amount)} is transferred because of the per-transfer limit.` : ''),
   };
 }

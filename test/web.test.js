@@ -27,7 +27,7 @@ const post = async (path, body) => { const r = await fetch(base + path, { method
 const get = async (path) => { const r = await fetch(base + path); return { status: r.status, body: await r.json() }; };
 const mine = (token) => post('/api/mis-reservas', { clienteToken: token }).then((r) => r.body);
 const buyer = () => createPayingFetch({ signer: privateKeyToAccount(generatePrivateKey()), maxPerPaymentWei: arsToWei(10000) });
-const reservar = (hora, { fecha = '2026-10-21', recurso = 'Cancha 1', cliente = {} } = {}) => post('/api/reservas', { recurso, fecha, hora, cliente: { nombre: 'Marta', canal: 'web', ...cliente } });
+const reservar = (hora, { fecha = '2026-10-21', recurso = 'Court 1', cliente = {} } = {}) => post('/api/reservas', { recurso, fecha, hora, cliente: { nombre: 'Marta', canal: 'web', ...cliente } });
 
 test('flujo web: reservar -> pagar -> ver en Mis reservas -> cancelar con vista previa', async () => {
   const r = await reservar('17:00', { cliente: { contacto: '351 555-1234' } });
@@ -52,17 +52,17 @@ test('flujo web: reservar -> pagar -> ver en Mis reservas -> cancelar con vista 
   // Antes de cancelar: cuánto devuelve y por qué (sin cancelar nada).
   const vista = await post(`/api/reservas/${reserva.id}/cancelar-vista`, { clienteToken });
   assert.equal(vista.status, 200);
-  assert.equal(vista.body.devolucion, '$ 6.000');
+  assert.equal(vista.body.devolucion, '$ 6,000');
   assert.equal(vista.body.regla, 'A_TIEMPO');
-  assert.match(vista.body.motivo, /toda la seña/);
+  assert.match(vista.body.motivo, /whole deposit/);
   assert.equal(ctx.store.getBooking(reserva.id).status, 'confirmed');
 
   const cancel = await post(`/api/reservas/${reserva.id}/cancelar`, { clienteToken });
   assert.equal(cancel.status, 200);
-  assert.equal(cancel.body.devolucion, '$ 6.000');
+  assert.equal(cancel.body.devolucion, '$ 6,000');
   m = await mine(clienteToken);
   assert.equal(m.reservas[0].estado, 'cancelled');
-  assert.equal(m.reservas[0].devuelto.texto, '$ 6.000');
+  assert.equal(m.reservas[0].devuelto.texto, '$ 6,000');
   assert.ok(ctx.store.transfersByStatus('sent').some((t) => t.booking_id === reserva.id));
 });
 
@@ -84,15 +84,15 @@ test('lista de espera desde la web: el turno liberado le aparece en Mis reservas
   assert.equal(second.status, 409);
   assert.equal(second.body.codigo, 'ocupado');
 
-  const w = await post('/api/lista-espera', { recurso: 'Cancha 1', fecha: '2026-10-21', hora: '20:00', cliente: { nombre: 'Segunda', canal: 'web' } });
+  const w = await post('/api/lista-espera', { recurso: 'Court 1', fecha: '2026-10-21', hora: '20:00', cliente: { nombre: 'Segunda', canal: 'web' } });
   assert.equal(w.status, 200);
   assert.equal(w.body.puesto, 1);
   const token = w.body.clienteToken;
   assert.match(token, /^api:[a-f0-9]{32}$/);
   assert.equal((await mine(token)).esperas[0].puesto, 1);
   // Anotarse de nuevo no la duplica; un turno libre no tiene lista.
-  assert.equal((await post('/api/lista-espera', { recurso: 'Cancha 1', fecha: '2026-10-21', hora: '20:00', cliente: { token } })).body.puesto, 1);
-  assert.equal((await post('/api/lista-espera', { recurso: 'Cancha 2', fecha: '2026-10-21', hora: '20:00', cliente: { token } })).status, 409);
+  assert.equal((await post('/api/lista-espera', { recurso: 'Court 1', fecha: '2026-10-21', hora: '20:00', cliente: { token } })).body.puesto, 1);
+  assert.equal((await post('/api/lista-espera', { recurso: 'Court 2', fecha: '2026-10-21', hora: '20:00', cliente: { token } })).status, 409);
 
   await post(`/api/reservas/${first.body.reserva.id}/cancelar`, { clienteToken: first.body.clienteToken });
   const after = await mine(token);
@@ -107,15 +107,15 @@ test('lista de espera desde la web: el turno liberado le aparece en Mis reservas
 });
 
 test('turnos: se ve qué está libre, ocupado o bloqueado y no se reserva lo bloqueado', async () => {
-  ctx.agent.createBlock({ tipo: 'turno', recurso: 'Cancha 2', fecha: '2026-10-22', hora: '12:00', motivo: 'Clase de pádel' });
+  ctx.agent.createBlock({ tipo: 'turno', recurso: 'Court 2', fecha: '2026-10-22', hora: '12:00', motivo: 'Clase de pádel' });
   const t = await get('/api/turnos?fecha=2026-10-22&libres=no');
-  const cell = t.body.turnos.find((x) => x.recurso === 'Cancha 2' && x.hora === '12:00');
+  const cell = t.body.turnos.find((x) => x.recurso === 'Court 2' && x.hora === '12:00');
   assert.equal(cell.estado, 'bloqueado');
   assert.equal(cell.motivo, 'Clase de pádel');
   assert.equal(cell.libre, false);
-  assert.equal(t.body.turnos.find((x) => x.recurso === 'Cancha 1' && x.hora === '12:00').estado, 'libre');
-  assert.ok(!(await get('/api/turnos?fecha=2026-10-22')).body.turnos.some((x) => x.recurso === 'Cancha 2' && x.hora === '12:00'));
-  const r = await reservar('12:00', { fecha: '2026-10-22', recurso: 'Cancha 2' });
+  assert.equal(t.body.turnos.find((x) => x.recurso === 'Court 1' && x.hora === '12:00').estado, 'libre');
+  assert.ok(!(await get('/api/turnos?fecha=2026-10-22')).body.turnos.some((x) => x.recurso === 'Court 2' && x.hora === '12:00'));
+  const r = await reservar('12:00', { fecha: '2026-10-22', recurso: 'Court 2' });
   assert.equal(r.status, 409);
   assert.equal(r.body.codigo, 'bloqueado');
   assert.match(r.body.error, /Clase de pádel/);
@@ -123,14 +123,14 @@ test('turnos: se ve qué está libre, ocupado o bloqueado y no se reserva lo blo
 
 test('los cambios de configuración se ven en lo público y una reserva nueva toma el precio nuevo', async () => {
   const before = (await get('/api/negocio')).body;
-  assert.equal(before.sena, '$ 6.000');
+  assert.equal(before.sena, '$ 6,000');
   assert.equal(before.modoPrueba, true); // la cadena de las pruebas es simulada
   ctx.agent.updateSettings({ precioTurnoArs: 30000, reservaSinPagarMinutos: 20 });
   const after = (await get('/api/negocio')).body;
-  assert.equal(after.sena, '$ 7.500');
+  assert.equal(after.sena, '$ 7,500');
   assert.equal(after.reservaSinPagarMinutos, 20);
   const r = await reservar('09:00', { fecha: '2026-10-23' });
-  assert.equal(r.body.reserva.sena.texto, '$ 7.500');
+  assert.equal(r.body.reserva.sena.texto, '$ 7,500');
   ctx.agent.updateSettings({ precioTurnoArs: 24000, reservaSinPagarMinutos: 15 });
   await post(`/api/reservas/${r.body.reserva.id}/cancelar`, { clienteToken: r.body.clienteToken });
 });
@@ -162,7 +162,7 @@ test('límite de reservas por IP en las rutas que crean cosas', async () => {
   const s = await new Promise((resolve) => { const x = app.listen(0, '127.0.0.1', () => resolve(x)); });
   try {
     const url = `http://127.0.0.1:${s.address().port}/api/reservas`;
-    const go = () => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ recurso: 'Cancha 1', fecha: '2026-10-21', hora: '20:00' }) });
+    const go = () => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ recurso: 'Court 1', fecha: '2026-10-21', hora: '20:00' }) });
     for (let i = 0; i < 3; i++) assert.notEqual((await go()).status, 429);
     const blocked = await go();
     assert.equal(blocked.status, 429);
@@ -178,7 +178,7 @@ test('un JSON roto responde 400 y no 500', async () => {
 // --- Páginas ------------------------------------------------------------------------------------
 
 test('la web, el registro público y los archivos de la página se sirven', async () => {
-  for (const [path, re] of [['/', /Reservá tu turno/], ['/decisiones', /Qué decide el agente/], ['/panel', /Panel del comercio/]]) {
+  for (const [path, re] of [['/', /Book your slot/], ['/decisiones', /What the agent decides/], ['/panel', /Venue dashboard/]]) {
     const res = await fetch(base + path);
     assert.equal(res.status, 200, path);
     assert.match(res.headers.get('content-security-policy'), /default-src 'self'/);

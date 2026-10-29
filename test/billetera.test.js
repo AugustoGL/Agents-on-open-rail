@@ -19,7 +19,7 @@ before(async () => {
 after(() => new Promise((resolve) => server.close(resolve)));
 
 const post = async (path, body) => { const r = await fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) }); return { status: r.status, body: await r.json() }; };
-const pagar = async (customer, dia, hora, payer, recurso = 'Cancha 1') => {
+const pagar = async (customer, dia, hora, payer, recurso = 'Court 1') => {
   const { booking } = ctx.agent.reserve({ resource: recurso, startAt: slot(dia, hora), customer });
   ctx.chain.credit(booking.deposit_wei);
   await ctx.agent.onPaymentSettled({ bookingId: booking.id, payer, tx: `0x${'ab'.repeat(32)}${booking.id}`, amountWei: booking.deposit_wei });
@@ -35,19 +35,19 @@ async function conectar(cuenta, { direccion = cuenta.address, firmante = cuenta 
 
 test('el mensaje a firmar dice qué se firma, para qué billetera, en qué sitio y cuándo vence', async () => {
   const d = await post('/api/billetera/desafio', { direccion: yo.address.toLowerCase() });
-  assert.match(d.body.mensaje, /Seña · Ver mis reservas/);
-  assert.match(d.body.mensaje, /no cuesta nada ni mueve plata/);
-  assert.ok(d.body.mensaje.includes(`Billetera: ${yo.address}`)); // la dirección queda normalizada
-  assert.match(d.body.mensaje, /Sitio: 127\.0\.0\.1/);
-  assert.ok(d.body.mensaje.includes(`Código: ${d.body.nonce}`));
+  assert.match(d.body.mensaje, /Seña · See my bookings/);
+  assert.match(d.body.mensaje, /costs nothing and moves no money/);
+  assert.ok(d.body.mensaje.includes(`Wallet: ${yo.address}`)); // la dirección queda normalizada
+  assert.match(d.body.mensaje, /Site: 127\.0\.0\.1/);
+  assert.ok(d.body.mensaje.includes(`Code: ${d.body.nonce}`));
   assert.match(d.body.nonce, /^[a-f0-9]{32}$/);
 });
 
 test('firmando se ven solo las reservas pagadas desde esa billetera', async () => {
   const mia1 = await pagar(alice, '2026-10-21', '20:00', yo.address);
-  const mia2 = await pagar(bob, '2026-10-22', '18:30', yo.address, 'Cancha 2'); // otra persona del chat, misma billetera
+  const mia2 = await pagar(bob, '2026-10-22', '18:30', yo.address, 'Court 2'); // otra persona del chat, misma billetera
   const ajena = await pagar(bob, '2026-10-23', '17:00', otra.address);
-  ctx.agent.reserve({ resource: 'Cancha 1', startAt: slot('2026-10-24', '12:00'), customer: alice }); // sin pagar: todavía no tiene billetera
+  ctx.agent.reserve({ resource: 'Court 1', startAt: slot('2026-10-24', '12:00'), customer: alice }); // sin pagar: todavía no tiene billetera
 
   const r = await conectar(yo);
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -112,13 +112,13 @@ test('con la sesión se puede ver la vista previa y cancelar: la seña vuelve a 
   const { body } = await conectar(yo);
   const vista = await post(`/api/billetera/reservas/${b.id}/cancelar-vista`, { sesion: body.sesion });
   assert.equal(vista.status, 200);
-  assert.equal(vista.body.devolucion, '$ 6.000');
+  assert.equal(vista.body.devolucion, '$ 6,000');
   assert.equal(vista.body.regla, 'A_TIEMPO');
   assert.equal(ctx.store.getBooking(b.id).status, 'confirmed'); // la vista previa no cancela nada
 
   const r = await post(`/api/billetera/reservas/${b.id}/cancelar`, { sesion: body.sesion });
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.equal(r.body.devolucion, '$ 6.000');
+  assert.equal(r.body.devolucion, '$ 6,000');
   assert.equal(ctx.store.getBooking(b.id).status, 'cancelled');
   const refund = ctx.store.transfersByStatus('sent').find((t) => t.booking_id === b.id);
   assert.equal(refund.to_address, yo.address);
@@ -131,7 +131,7 @@ test('con la sesión se puede ver la vista previa y cancelar: la seña vuelve a 
 });
 
 test('una sesión no sirve para las reservas de otra billetera, y sin sesión o vencida se vuelve a firmar', async () => {
-  const ajena = await pagar(bob, '2026-10-24', '17:00', otra.address, 'Cancha 2');
+  const ajena = await pagar(bob, '2026-10-24', '17:00', otra.address, 'Court 2');
   const { body } = await conectar(yo);
   for (const ruta of ['cancelar-vista', 'cancelar']) {
     const r = await post(`/api/billetera/reservas/${ajena.id}/${ruta}`, { sesion: body.sesion });
@@ -152,7 +152,7 @@ test('una sesión no sirve para las reservas de otra billetera, y sin sesión o 
 
 test('un agente de IA que pagó por x402 puede consultar sus reservas firmando con su clave', async () => {
   const agente = privateKeyToAccount(generatePrivateKey());
-  const b = await pagar({ id: `api:${'1'.repeat(32)}`, name: 'Agente', channel: 'api' }, '2026-10-23', '12:00', agente.address, 'Cancha 2');
+  const b = await pagar({ id: `api:${'1'.repeat(32)}`, name: 'Agente', channel: 'api' }, '2026-10-23', '12:00', agente.address, 'Court 2');
   const { body } = await conectar(agente);
   assert.deepEqual(body.reservas.map((x) => x.id), [b.id]);
   assert.match(body.reservas[0].pagoTx, /^0x/);

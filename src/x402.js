@@ -50,10 +50,10 @@ export function createPaymentServer({ agent, facilitator, payTo, builderCode, lo
   // Antes de liquidar: si la reserva dejó de ser pagable, no se cobra.
   server.onBeforeSettle(async (ctx) => {
     const id = bookingIdFrom(ctx);
-    const check = id ? agent.checkPayable(id) : { ok: false, reason: 'Ruta sin reserva.' };
+    const check = id ? agent.checkPayable(id) : { ok: false, reason: 'Route without a booking.' };
     if (!check.ok && !agent.canAcceptLatePayment(id)) return { abort: true, reason: check.reason };
     if (check.booking && BigInt(ctx.requirements.amount) !== BigInt(check.booking.deposit_wei)) {
-      return { abort: true, reason: 'El monto no coincide con la seña.' };
+      return { abort: true, reason: 'The amount does not match the deposit.' };
     }
     return undefined;
   });
@@ -94,7 +94,7 @@ export function createPaymentServer({ agent, facilitator, payTo, builderCode, lo
           return warsPrice(check.booking?.deposit_wei ?? 0n);
         },
       },
-      description: 'Seña de un turno (wARS, Celo)',
+      description: 'Deposit for a slot (wARS, Celo)',
       mimeType: 'application/json',
       serviceName: agent.business.nombre,
       extensions,
@@ -133,12 +133,12 @@ export class MockFacilitator {
     const p = paymentPayload?.payload;
     const auth = p?.permit2Authorization;
     const fail = (invalidReason, invalidMessage) => ({ isValid: false, invalidReason, invalidMessage });
-    if (!auth || !p.signature) return fail('invalid_payload', 'Falta la autorización Permit2.');
-    if (getAddress(auth.permitted.token) !== getAddress(requirements.asset)) return fail('asset_mismatch', 'Token incorrecto.');
-    if (BigInt(auth.permitted.amount) !== BigInt(requirements.amount)) return fail('amount_mismatch', 'Monto incorrecto.');
-    if (getAddress(auth.witness.to) !== getAddress(requirements.payTo)) return fail('payto_mismatch', 'Destino incorrecto.');
-    if (getAddress(auth.spender) !== getAddress(x402ExactPermit2ProxyAddress)) return fail('spender_mismatch', 'Spender incorrecto.');
-    if (Number(auth.deadline) < Math.floor(Date.now() / 1000)) return fail('expired', 'Autorización vencida.');
+    if (!auth || !p.signature) return fail('invalid_payload', 'The Permit2 authorization is missing.');
+    if (getAddress(auth.permitted.token) !== getAddress(requirements.asset)) return fail('asset_mismatch', 'Wrong token.');
+    if (BigInt(auth.permitted.amount) !== BigInt(requirements.amount)) return fail('amount_mismatch', 'Wrong amount.');
+    if (getAddress(auth.witness.to) !== getAddress(requirements.payTo)) return fail('payto_mismatch', 'Wrong destination.');
+    if (getAddress(auth.spender) !== getAddress(x402ExactPermit2ProxyAddress)) return fail('spender_mismatch', 'Wrong spender.');
+    if (Number(auth.deadline) < Math.floor(Date.now() / 1000)) return fail('expired', 'Authorization expired.');
     const valid = await verifyTypedData({
       address: auth.from,
       domain: { name: 'Permit2', chainId: CELO_CHAIN_ID, verifyingContract: PERMIT2_ADDRESS },
@@ -153,8 +153,8 @@ export class MockFacilitator {
       },
       signature: p.signature,
     });
-    if (!valid) return fail('invalid_signature', 'La firma Permit2 no es válida.');
-    if (this.seenNonces.has(auth.nonce)) return fail('nonce_used', 'Esa autorización ya se usó.');
+    if (!valid) return fail('invalid_signature', 'The Permit2 signature is not valid.');
+    if (this.seenNonces.has(auth.nonce)) return fail('nonce_used', 'That authorization was already used.');
     return { isValid: true, payer: auth.from };
   }
 
