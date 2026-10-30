@@ -83,6 +83,7 @@
   --icon-error: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M9 9l6 6M15 9l-6 6'/%3E%3C/svg%3E");
   --icon-calendar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5' width='17' height='15.5' rx='3'/%3E%3Cpath d='M8 3v4M16 3v4M3.5 10h17'/%3E%3C/svg%3E");
   --icon-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 11l8-7 8 7v9a1 1 0 01-1 1h-4v-6h-6v6H5a1 1 0 01-1-1z'/%3E%3C/svg%3E");
+  --icon-send: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 2 11 13M22 2l-7 20-4-9-9-4z'/%3E%3C/svg%3E");
   --icon-list: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01'/%3E%3C/svg%3E");
   --icon-bell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 16v-5a6 6 0 1112 0v5l1.5 2h-15zM10 21h4'/%3E%3C/svg%3E");
   --icon-doc: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 3h7l5 5v13H7z'/%3E%3Cpath d='M14 3v5h5M10 13h6M10 17h6'/%3E%3C/svg%3E");
@@ -230,6 +231,7 @@ button { font: inherit; }
 .i-calendar { --i: var(--icon-calendar); }
 .i-home { --i: var(--icon-home); }
 .i-list { --i: var(--icon-list); }
+.i-send { --i: var(--icon-send); }
 .i-bell { --i: var(--icon-bell); }
 .i-doc { --i: var(--icon-doc); }
 .i-sliders { --i: var(--icon-sliders); }
@@ -421,6 +423,11 @@ button { font: inherit; }
 .marca-logo .i { width: 1.1rem; height: 1.1rem; }
 .nav-superior { display: none; gap: var(--sp-1); margin-left: auto; }
 .nav-link { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 44px; padding: 0 var(--sp-3); border-radius: var(--r-md); color: var(--ink-muted); font-weight: 600; text-decoration: none; background: transparent; border: 0; cursor: pointer; }
+/* Botón de Telegram: color de marca de Telegram, en la variante oscura (#1A7FB0) para que el texto blanco tenga contraste AA. */
+.lugar-telegram { display: inline-flex; margin-left: var(--sp-2); }
+.btn-telegram { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 44px; padding: 0 var(--sp-4); border-radius: var(--r-md); background: #1a7fb0; color: #fff; font-weight: 700; text-decoration: none; }
+.btn-telegram:hover { background: #156a93; color: #fff; }
+.btn-telegram .i { width: 1.1rem; height: 1.1rem; }
 .nav-link:hover { background: var(--primary-soft); color: var(--primary-soft-ink); }
 .nav-link[aria-current="page"], .nav-link[aria-selected="true"] { background: var(--primary-soft); color: var(--primary-soft-ink); }
 @media (min-width: 900px) { .nav-superior { display: flex; } }

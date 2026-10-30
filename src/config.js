@@ -57,6 +57,10 @@ export function loadConfig() {
     payTo: payTo ? getAddress(payTo) : undefined,
     payoutAddress: payout ? getAddress(payout) : null,
     telegramToken: env('TELEGRAM_BOT_TOKEN'),
+    // Usuario público del bot (sin @): lo usa el botón de Telegram de la web. Opcional.
+    telegramUsername: (env('TELEGRAM_BOT_USERNAME') ?? '').replace(/^@/, '') || null,
+    // Solo para la demo del hackathon: muestra la clave del panel en la pantalla de ingreso (nunca en modo live).
+    demoPanelPublico: env('DEMO_PANEL_PUBLICO', 'false') === 'true',
     ownerChatId: env('OWNER_CHAT_ID'),
     anthropicApiKey: env('ANTHROPIC_API_KEY'),
     anthropicModel: env('ANTHROPIC_MODEL', 'claude-haiku-5-5'),

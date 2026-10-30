@@ -5,6 +5,8 @@
 //   npm run capturas                  -> docs/capturas/
 //   OUT=/tmp/capturas npm run capturas
 //   CHROME_BIN=/ruta/chromium npm run capturas
+//   ESCALA=2 npm run capturas         -> imágenes al doble de resolución
+//   SOLO='^21-panel' npm run capturas -> solo las pantallas cuyo nombre coincida
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -121,7 +123,7 @@ let total = 0;
 async function pantalla(v, nombre, srv, { antes, preparar, esperar, maxHeight = 3600 } = {}) {
   if (v.solo && !v.solo.includes(nombre)) return;
   if (process.env.SOLO && !new RegExp(process.env.SOLO).test(nombre)) return;
-  const page = await chrome.newPage({ width: v.width, height: v.height, mobile: v.mobile, dark: v.dark });
+  const page = await chrome.newPage({ width: v.width, height: v.height, mobile: v.mobile, dark: v.dark, scale: Number(process.env.ESCALA ?? 1) });
   try {
     if (preparar) await preparar(page);
     if (nombre === '20-panel-ingreso') { await page.cmd('Network.enable'); await page.cmd('Network.clearBrowserCookies'); }

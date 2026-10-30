@@ -46,7 +46,7 @@ server {
 
 Con Caddy: `sena.example.com { reverse_proxy 127.0.0.1:8402 }`. Si el proxy corre en un contenedor, conectá Seña a su red de Docker y apuntá al nombre del contenedor (`sena-demo:8402`).
 
-Sin dominio propio: Let's Encrypt también emite certificados para **direcciones IP** (de 6 días, con renovación automática; hace falta Certbot 5.4 o más, el modo `webroot` y un `--deploy-hook` que recargue el servidor web) y hay nombres gratuitos como DuckDNS. Detalles: [Let's Encrypt](https://letsencrypt.org/2026/03/11/shorter-certs-certbot).
+Sin dominio propio: ojo, **si la IP la comparte otro sitio, entrar por la IP lleva a ese otro sitio**; en ese caso hace falta un nombre (por ejemplo uno gratis de DuckDNS) que el servidor web enrute a Seña. Si la IP es solo tuya, Let's Encrypt también emite certificados para **direcciones IP** (de 6 días, con renovación automática; hace falta Certbot 5.4 o más, el modo `webroot` y un `--deploy-hook` que recargue el servidor web) y hay nombres gratuitos como DuckDNS. Detalles: [Let's Encrypt](https://letsencrypt.org/2026/03/11/shorter-certs-certbot).
 
 ## 4. Respaldo y restauración
 

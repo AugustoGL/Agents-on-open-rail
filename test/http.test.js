@@ -36,6 +36,9 @@ test('info del negocio y turnos libres', async () => {
   const info = await (await fetch(`${base}/api/negocio`)).json();
   assert.equal(info.sena, '$ 6,000');
   assert.equal(info.moneda.direccion, WARS.address);
+  // Sin configurar, la web no muestra botón de Telegram ni regala la clave del panel.
+  assert.equal(info.telegram, null);
+  assert.equal(info.claveDemoPanel, null);
   const turnos = await (await fetch(`${base}/api/turnos?fecha=2026-10-21`)).json();
   assert.equal(turnos.turnos.length, 14);
 });

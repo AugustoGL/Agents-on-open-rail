@@ -56,6 +56,8 @@ async function main() {
   const app = createApp({
     agent, payments, logger, registration: { agentId: cfg.erc8004AgentId, repoUrl: cfg.repoUrl },
     dashboardPassword: cfg.dashboardPassword, trustProxy: cfg.trustProxy,
+    telegramUsername: cfg.telegramUsername,
+    demoPanelPassword: cfg.demoPanelPublico && cfg.mode === 'mock' ? cfg.dashboardPassword : null,
   });
   const server = app.listen(cfg.port, cfg.host, () => {
     logger.info(`Seña escuchando en ${cfg.publicBaseUrl} (${cfg.host}:${cfg.port}) · modo ${cfg.mode} · wallet ${chain.address}`);

@@ -65,7 +65,7 @@ function parseStart(body, agent) {
  */
 export function createApp({
   agent, payments, registration = {}, logger = console, syncFacilitatorOnStart = true,
-  dashboardPassword, trustProxy = false, createLimit = { windowMs: 10 * 60_000, max: 30 }, panelOptions = {}, walletOptions = {},
+  dashboardPassword, trustProxy = false, telegramUsername = null, demoPanelPassword = null, createLimit = { windowMs: 10 * 60_000, max: 30 }, panelOptions = {}, walletOptions = {},
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -121,6 +121,8 @@ export function createApp({
       sena: formatArs(agent.depositWei()),
       moneda: { token: 'wARS', direccion: WARS.address, decimales: WARS.decimals, red: CELO_NETWORK },
       modoPrueba: agent.chain.mode === 'mock',
+      telegram: telegramUsername ? `https://t.me/${telegramUsername}` : null,
+      claveDemoPanel: demoPanelPassword && b.esDemostracion ? demoPanelPassword : null,
       nft: agent.nft ? { red: agent.nft.redNombre, simulado: agent.nft.simulated } : null,
       hoy: localDateStr(agent.now(), agent.offset),
       listaEsperaMinutos: p.ofertaListaEsperaMinutos,

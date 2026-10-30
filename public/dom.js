@@ -118,7 +118,7 @@ export function aviso(kind, ...content) {
 export function carteles(negocio, { modoPrueba } = {}) {
   const prueba = modoPrueba ?? negocio.modoPrueba;
   return [
-    negocio.esDemostracion ? h('div', { class: 'cartel cartel--demo', role: 'note' }, icono('alert'), h('div', {}, h('strong', {}, 'Demo venue.'), ' The slots and prices are examples.')) : null,
+    negocio.esDemostracion ? h('div', { class: 'cartel cartel--demo', role: 'note' }, icono('alert'), h('div', {}, h('strong', {}, 'Demo venue.'), ' The slots and prices are examples. This is a live demo built for the Agents on Open Rails hackathon.')) : null,
     prueba ? h('div', { class: 'cartel cartel--prueba', role: 'note' }, icono('info'), h('div', {}, h('strong', {}, 'TEST MODE.'), ' No real money moves.')) : null,
   ];
 }
@@ -141,11 +141,17 @@ export function vacio({ icon = 'calendar', titulo, texto, accion }) {
 
 /** Barra superior de las páginas del cliente. */
 export function barraCliente({ activa } = {}) {
+  // El botón de Telegram aparece cuando el servidor conoce el usuario del bot (TELEGRAM_BOT_USERNAME).
+  const lugarTelegram = h('span', { class: 'lugar-telegram' });
+  request('GET', '/api/negocio').then((n) => {
+    if (n.telegram) setChildren(lugarTelegram, h('a', { class: 'btn-telegram', href: safeHref(n.telegram), target: '_blank', rel: 'noopener noreferrer' }, icono('send'), 'Telegram'));
+  }).catch(() => {});
   return h('header', { class: 'barra' }, h('div', { class: 'barra-interior' },
     h('a', { class: 'marca', href: '/' }, h('span', { class: 'marca-logo' }, icono('check')), 'Seña'),
     h('a', { class: 'nav-link solo-movil al-final', href: '/#mis-reservas' }, icono('list'), 'My bookings'),
     h('nav', { class: 'nav-superior', 'aria-label': 'Main' },
       h('a', { class: 'nav-link', href: '/', ...(activa === 'reservar' ? { 'aria-current': 'page' } : {}) }, icono('calendar'), 'Book'),
       h('a', { class: 'nav-link', href: '/#mis-reservas' }, icono('list'), 'My bookings'),
-      h('a', { class: 'nav-link', href: '/decisiones' }, icono('doc'), 'What the agent decides'))));
+      h('a', { class: 'nav-link', href: '/decisiones' }, icono('doc'), 'What the agent decides')),
+    lugarTelegram));
 }

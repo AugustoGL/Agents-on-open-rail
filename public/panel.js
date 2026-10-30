@@ -87,6 +87,13 @@ function mostrarIngreso(mensaje) {
   const input = h('input', { type: 'password', id: 'clave', class: 'input', autocomplete: 'current-password', required: true, 'aria-describedby': 'clave-error' });
   const ver = h('input', { type: 'checkbox', onchange: (e) => { input.type = e.target.checked ? 'text' : 'password'; } });
   const boton = h('button', { type: 'submit', class: 'btn btn-primario btn-grande btn-bloque' }, 'Sign in');
+  const ayuda = h('p', { class: 'ayuda' }, 'The password is the one you set in OWNER_DASHBOARD_PASSWORD, in the .env file.');
+  // En la demo del hackathon la clave es pública a propósito (el servidor solo la manda si esDemostracion y DEMO_PANEL_PUBLICO).
+  request('GET', '/api/negocio').then((n) => {
+    if (!n.claveDemoPanel) return;
+    setChildren(ayuda, 'Hackathon demo: anyone can try the dashboard. The password is ', h('strong', { class: 'mono' }, n.claveDemoPanel), '. ',
+      h('button', { type: 'button', class: 'btn btn-secundario', onclick: () => { input.value = n.claveDemoPanel; input.focus(); } }, 'Fill it in'));
+  }).catch(() => {});
   const form = h('form', {
     class: 'tarjeta tarjeta--realzada pila',
     onsubmit: async (e) => {
@@ -103,7 +110,7 @@ function mostrarIngreso(mensaje) {
       } finally { boton.removeAttribute('aria-busy'); }
     },
   }, h('div', { class: 'campo' }, h('label', { for: 'clave' }, 'Dashboard password'), input), h('label', { class: 'marca-check' }, ver, 'Show password'), error, boton,
-  h('p', { class: 'ayuda' }, 'The password is the one you set in OWNER_DASHBOARD_PASSWORD, in the .env file.'));
+  ayuda);
   setChildren(app, h('main', { class: 'pantalla-ingreso', id: 'contenido' }, h('div', { class: 'insignia-grande' }, icono('lock')),
     h('div', { class: 'centrado pila--chica' }, h('h1', {}, 'Venue dashboard'), h('p', { class: 'apagado' }, sessionInfo?.negocio ?? 'Seña')), form,
     h('a', { href: '/', class: 'btn btn-fantasma' }, 'Back to the booking site')));
