@@ -26,11 +26,12 @@ export function setChildren(el, ...children) {
   return el;
 }
 
-/** Solo links propios o a Celoscan: nada de javascript: ni de dominios que vengan de datos. */
+/** Solo links propios, a Celoscan o al bot de Telegram: nada de javascript: ni de dominios que vengan de datos. */
 export function safeHref(href) {
   const s = String(href);
   if (/^\/[A-Za-z0-9/_\-.?=&]*$/.test(s)) return s;
   if (/^https:\/\/celoscan\.io\/tx\/0x[a-fA-F0-9]{64}$/.test(s)) return s;
+  if (/^https:\/\/t\.me\/[A-Za-z0-9_]{5,32}$/.test(s)) return s; // el bot de Telegram del negocio
   return '#';
 }
 
