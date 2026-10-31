@@ -121,6 +121,8 @@ export function createApp({
       sena: formatArs(agent.depositWei()),
       moneda: { token: 'wARS', direccion: WARS.address, decimales: WARS.decimals, red: CELO_NETWORK },
       modoPrueba: agent.chain.mode === 'mock',
+      // Movimientos de wARS de la wallet del agente en Celoscan (solo con plata real: en modo de prueba la wallet es simulada).
+      celoscanWars: agent.chain.mode === 'mock' ? null : `https://celoscan.io/token/${WARS.address}?a=${agent.chain.address}`,
       telegram: telegramUsername ? `https://t.me/${telegramUsername}` : null,
       claveDemoPanel: demoPanelPassword && b.esDemostracion ? demoPanelPassword : null,
       nft: agent.nft ? { red: agent.nft.redNombre, simulado: agent.nft.simulated } : null,
@@ -372,6 +374,10 @@ export function createApp({
       const b = agent.store.getBooking(d.booking_id);
       if (b) out.monto = formatArs(b.deposit_wei);
     }
+    if (d.kind === 'transferencia') {
+      const m = /\$ [\d.,]+/.exec(d.reason ?? '');
+      if (m) out.monto = m[0];
+    }
     return out;
   };
 
@@ -379,7 +385,7 @@ export function createApp({
     const limit = Math.min(Number(req.query.limit) || 30, 200);
     res.json({
       decisiones: agent.store.decisions({ limit }).map((d) => ({
-        id: d.id, fecha: new Date(d.at).toISOString(), reserva: d.booking_id, tipo: d.kind, regla: d.rule, motivo: maskAddresses(d.reason), tx: d.tx, datos: publicData(d),
+        id: d.id, fecha: new Date(d.at).toISOString(), reserva: d.booking_id, tipo: d.kind, regla: d.rule, motivo: maskAddresses(d.reason)?.replace(/^Se enviaron (.*) en wARS a /, 'Sent $1 in wARS to '), tx: d.tx, datos: publicData(d),
       })),
     });
   });

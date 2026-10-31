@@ -93,6 +93,16 @@ Seguridad del panel: clave comparada en tiempo constante, límite de intentos, c
 - **ERC-721 + ERC-5192**: el ticket NFT intransferible de cada reserva (`contracts/SenaTicket.sol`), en Celo Sepolia por defecto.
 - **Fee abstraction (CIP-64)**: opcionalmente el agente paga su gas en USA₮/USDC en vez de CELO (`FEE_CURRENCY`).
 
+## Verificarlo en la cadena
+
+Todo lo que mueve el agente se puede comprobar en Celoscan, sin confiar en este servidor:
+
+- **Movimientos de wARS de la wallet del agente** (cobros de seña que entran, devoluciones y retiros que salen): [celoscan.io/token/0x0DC4…D90D?a=0x84c6…67C8](https://celoscan.io/token/0x0DC4F92879B7670e5f4e4e6e3c801D229129D90D?a=0x84c67d2cB87C7f8EA1355B8F0914A2a3Df0367C8).
+- **Cada decisión del registro público** (`/decisiones`) trae el hash de su transacción, con enlace a Celoscan. La etiqueta ERC-8021 se comprueba con `npm run verify-tag -- 0x<hash>`.
+- **Identidad ERC-8004** del agente (`agentId` 9990): registro `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`, dueña la wallet del agente.
+
+En la web, `/decisiones` muestra el mismo enlace cuando el servidor corre con plata real (`MODE=live`).
+
 ## Arquitectura
 
 ```

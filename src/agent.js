@@ -512,7 +512,7 @@ export class SenaAgent {
           this.store.updateTransfer(t.id, { status: 'sent', tx: hash, error: null }, this.now());
           this.log({
             booking_id: t.booking_id, kind: 'transferencia', rule: t.kind === 'refund' ? 'DEVOLUCION_ENVIADA' : 'RETIRO_ENVIADO',
-            reason: `Se enviaron ${formatArs(t.amount_wei)} en wARS a ${t.to_address}.`, tx: hash,
+            reason: `Sent ${formatArs(t.amount_wei)} in wARS to ${t.to_address}.`, tx: hash,
           });
           sent++;
           if (t.kind === 'refund' && t.booking_id) {

@@ -1,5 +1,5 @@
 // Public log de decisiones del agente. Los datos entran siempre como texto.
-import { h, $, setChildren, request, carteles, barraCliente, aviso, esqueletos, vacio } from '/static/dom.js';
+import { h, $, setChildren, request, safeHref, carteles, barraCliente, aviso, esqueletos, vacio } from '/static/dom.js';
 import { GRUPOS, grupoDe, agruparPorDia, tarjetaDecision } from '/static/decisiones-vista.js';
 
 const S = { negocio: null, resumen: null, decisiones: [], grupo: '', cargando: true, error: null };
@@ -62,6 +62,7 @@ async function cargar() {
   try {
     const [negocio, resumen, data] = await Promise.all([request('GET', '/api/negocio'), request('GET', '/api/resumen-publico'), request('GET', '/api/decisiones?limit=150')]);
     S.negocio = negocio; S.resumen = resumen; S.decisiones = data.decisiones;
+    if (negocio.celoscanWars) { $('#celoscan-link').href = safeHref(negocio.celoscanWars); $('#celoscan').hidden = false; }
     setChildren($('#carteles'), carteles(negocio));
     renderReglas(); renderNumeros();
   } catch (err) {
