@@ -143,10 +143,12 @@ export function vacio({ icon = 'calendar', titulo, texto, accion }) {
 
 /** Barra superior de las páginas del cliente. */
 export function barraCliente({ activa } = {}) {
-  // El botón de Telegram aparece cuando el servidor conoce el usuario del bot (TELEGRAM_BOT_USERNAME).
+  // Los botones de Telegram (TELEGRAM_BOT_USERNAME) y de Celoscan (wallet del agente) aparecen cuando el servidor conoce el dato.
   const lugarTelegram = h('span', { class: 'lugar-telegram' });
   request('GET', '/api/negocio').then((n) => {
-    if (n.telegram) setChildren(lugarTelegram, h('a', { class: 'btn-telegram', href: safeHref(n.telegram), target: '_blank', rel: 'noopener noreferrer' }, icono('send'), 'Telegram'));
+    setChildren(lugarTelegram,
+      n.telegram ? h('a', { class: 'btn-telegram', href: safeHref(n.telegram), target: '_blank', rel: 'noopener noreferrer' }, icono('send'), 'Telegram') : null,
+      n.celoscanWars ? h('a', { class: 'btn-celo', href: safeHref(n.celoscanWars), target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'Celoscan: agent wARS movements' }, h('span', { class: 'celo-c', 'aria-hidden': 'true' }, 'C'), h('span', { class: 'btn-celo-texto' }, 'Celoscan')) : null);
   }).catch(() => {});
   return h('header', { class: 'barra' }, h('div', { class: 'barra-interior' },
     h('a', { class: 'marca', href: '/' }, h('span', { class: 'marca-logo' }, icono('check')), 'Seña'),

@@ -65,7 +65,7 @@ function parseStart(body, agent) {
  */
 export function createApp({
   agent, payments, registration = {}, logger = console, syncFacilitatorOnStart = true,
-  dashboardPassword, trustProxy = false, telegramUsername = null, demoPanelPassword = null, createLimit = { windowMs: 10 * 60_000, max: 30 }, panelOptions = {}, walletOptions = {},
+  dashboardPassword, trustProxy = false, telegramUsername = null, celoscanAddress = null, demoPanelPassword = null, createLimit = { windowMs: 10 * 60_000, max: 30 }, panelOptions = {}, walletOptions = {},
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -107,6 +107,7 @@ export function createApp({
   app.get(['/panel', '/panel/'], page('panel.html'));
   app.use('/panel', createPanelRouter({ agent, password: dashboardPassword, logger, ...panelOptions }));
 
+  const celoscanTarget = agent.chain.mode === 'mock' ? celoscanAddress : agent.chain.address;
   app.get('/api/negocio', (_req, res) => {
     const b = agent.business;
     const p = b.politica;
@@ -121,8 +122,8 @@ export function createApp({
       sena: formatArs(agent.depositWei()),
       moneda: { token: 'wARS', direccion: WARS.address, decimales: WARS.decimals, red: CELO_NETWORK },
       modoPrueba: agent.chain.mode === 'mock',
-      // Movimientos de wARS de la wallet del agente en Celoscan (solo con plata real: en modo de prueba la wallet es simulada).
-      celoscanWars: agent.chain.mode === 'mock' ? null : `https://celoscan.io/token/${WARS.address}?a=${agent.chain.address}`,
+      // Movimientos de wARS del agente en Celoscan. En modo de prueba la wallet de la instancia es simulada: solo hay enlace si se configuró la pública.
+      celoscanWars: celoscanTarget ? `https://celoscan.io/token/${WARS.address}?a=${celoscanTarget}` : null,
       telegram: telegramUsername ? `https://t.me/${telegramUsername}` : null,
       claveDemoPanel: demoPanelPassword && b.esDemostracion ? demoPanelPassword : null,
       nft: agent.nft ? { red: agent.nft.redNombre, simulado: agent.nft.simulated } : null,

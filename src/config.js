@@ -59,6 +59,8 @@ export function loadConfig() {
     telegramToken: env('TELEGRAM_BOT_TOKEN'),
     // Usuario público del bot (sin @): lo usa el botón de Telegram de la web. Opcional.
     telegramUsername: (env('TELEGRAM_BOT_USERNAME') ?? '').replace(/^@/, '') || null,
+    // Wallet pública del agente en mainnet para el enlace a Celoscan cuando la instancia está en modo de prueba (su wallet es simulada). Opcional.
+    agentPublicAddress: /^0x[a-fA-F0-9]{40}$/.test(env('AGENT_PUBLIC_ADDRESS') ?? '') ? env('AGENT_PUBLIC_ADDRESS') : null,
     // Solo para la demo del hackathon: muestra la clave del panel en la pantalla de ingreso (nunca en modo live).
     demoPanelPublico: env('DEMO_PANEL_PUBLICO', 'false') === 'true',
     ownerChatId: env('OWNER_CHAT_ID'),
